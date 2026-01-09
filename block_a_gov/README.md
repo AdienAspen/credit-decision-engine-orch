@@ -8,3 +8,6 @@ Stack v0.1 (PoC):
 - REPORTER: Qwen2.5-7B-Instruct (local, CPU)
 
 Rule: .md governs; runtime can be swapped without breaking contracts.
+
+## Specs (v0.1)
+- spec/decision_pack_v0_1.md — Decision Pack contract + RISK_T2 payload
