@@ -164,6 +164,22 @@ def main() -> int:
         safe_write_json(Path(args.out), payload)
         print(f"[OK] Wrote: {args.out}")
     else:
+        # --- Spec compliance: emit exact v0.1 fields only ---
+        _STRICT_FIELDS = [
+          'meta_schema_version',
+          'meta_generated_at',
+          'meta_request_id',
+          'meta_client_id',
+          'meta_model_tag',
+          'meta_model_file',
+          'meta_operating_point',
+          'meta_latency_ms',
+          'score_default_prob',
+          'thr_default',
+          'decision_default',
+        ]
+        payload = {k: payload.get(k) for k in _STRICT_FIELDS}
+
         print(json.dumps(payload, indent=2, ensure_ascii=False))
 
     return 0
