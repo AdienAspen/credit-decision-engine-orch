@@ -158,7 +158,30 @@ def main():
         "--feature-list-file",
         default="/home/adien/loan_backbone_ml_T4_PAYOFF/reports/t4_payoff_xgb_v1_guarded_feature_list.json",
     )
+    ap.add_argument(
+        "--canonical-alias",
+        default="/home/adien/loan_backbone_ml_BLOCK_A_AGENTS/block_a_gov/artifacts/t4_payoff_canonical.json",
+        help="Path to canonical alias JSON (swap-friendly). If provided, it supplies default model/threshold/feature paths."
+    )
     args = ap.parse_args()
+
+    # Canonical alias resolution (swap-friendly defaults)
+    alias_payload = None
+    try:
+        alias_path = Path(args.canonical_alias)
+        if alias_path.exists():
+            alias_payload = load_json(alias_path)
+    except Exception:
+        alias_payload = None
+
+    if isinstance(alias_payload, dict):
+        # Only fill defaults if user did NOT explicitly override via CLI
+        if args.model_file == ap.get_default("model_file"):
+            args.model_file = alias_payload.get("model", {}).get("model_file", args.model_file)
+        if args.thresholds_file == ap.get_default("thresholds_file"):
+            args.thresholds_file = alias_payload.get("thresholds", {}).get("thresholds_file", args.thresholds_file)
+        if args.feature_list_file == ap.get_default("feature_list_file"):
+            args.feature_list_file = alias_payload.get("model", {}).get("feature_list_file", args.feature_list_file)
 
     t0 = time.time()
     model_path = Path(args.model_file)
