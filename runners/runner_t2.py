@@ -12,6 +12,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+def load_json(p: Path):
+    return json.loads(Path(p).read_text(encoding="utf-8"))
+
 import numpy as np
 import xgboost as xgb
 
@@ -108,6 +111,11 @@ def main() -> int:
         help="Operating pick JSON path (contains OP_A/OP_B thresholds and metrics)",
     )
     ap.add_argument(
+        "--canonical-alias",
+        default="/home/adien/loan_backbone_ml_BLOCK_A_AGENTS/block_a_gov/artifacts/t2_default_canonical.json",
+        help="Path to canonical alias JSON (swap-friendly). If provided, it supplies default model/feature/operating_pick paths."
+    )
+    ap.add_argument(
         "--op",
         choices=["op_a", "op_b"],
         default="op_a",
@@ -120,6 +128,30 @@ def main() -> int:
     )
 
     args = ap.parse_args()
+
+    # Canonical alias resolution (swap-friendly defaults)
+    alias_payload = None
+    try:
+        alias_path = Path(args.canonical_alias)
+        if alias_path.exists():
+            alias_payload = load_json(alias_path)
+    except Exception:
+        alias_payload = None
+
+    if isinstance(alias_payload, dict):
+        # Fill defaults ONLY if user did NOT override via CLI
+        if hasattr(args, "model_file") and args.model_file == ap.get_default("model_file"):
+            args.model_file = alias_payload.get("model", {}).get("model_file", args.model_file)
+        if hasattr(args, "feature_list_file") and args.feature_list_file == ap.get_default("feature_list_file"):
+            args.feature_list_file = alias_payload.get("model", {}).get("feature_list_file", args.feature_list_file)
+        if hasattr(args, "operating_pick") and args.operating_pick == ap.get_default("operating_pick"):
+            args.operating_pick = alias_payload.get("operating", {}).get("operating_pick_file", args.operating_pick)
+        op_default = alias_payload.get("operating", {}).get("default_operating_point")
+        if op_default:
+            for attr in ["op", "operating_point", "operating_point_id", "operating_point_name"]:
+                if hasattr(args, attr) and getattr(args, attr) == ap.get_default(attr):
+                    setattr(args, attr, op_default)
+
 
     t0 = time.time()
     model_path = Path(args.model_json)
