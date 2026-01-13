@@ -1,0 +1,15 @@
+{
+  "canonical_id": "t3_fraud_canonical",
+  "task": "T3_FRAUD",
+  "schema_versions": {
+    "input_efv": "efv_0.1",
+    "output_contract": "risk_decision_t3_v0_1"
+  },
+  "model": {
+    "model_tag": "fraud_t3_ieee_xgb_bcd_best",
+    "model_file": "/home/adien/loan_backbone_ml_T3_FRAUD/models/fraud_t3_ieee_xgb_bcd_best.json"
+  },
+  "thresholds": {
+    "thresholds_file": "/home/adien/loan_backbone_ml_T3_FRAUD/reports/fraud_t3_ieee_bcd_best_thresholds.json"
+  }
+}
