@@ -96,3 +96,66 @@ Optional convenience mapping (if we later want flattened fields):
 - RISK_T2 must be deterministic when inputs are deterministic (seed/request_id), when applicable.
 - RISK_T2 must not call dynamic sensors directly (ORIGINATE only).
 - Threshold choice is controlled via `operating_pick.json` (OP_A / OP_B).
+
+---
+
+## RISK_T3 (Fraud) — Output payload (exact fields v0.1)
+**Schema version:** `risk_decision_t3_v0_1`
+
+Required:
+- `meta_schema_version` (string) = `risk_decision_t3_v0_1`
+- `meta_generated_at` (ISO-8601 UTC)
+- `meta_request_id` (string|null)
+- `meta_client_id` (string)
+- `meta_model_tag` (string) — e.g. `fraud_t3_ieee_xgb_bcd_best`
+- `meta_model_file` (string) — path or logical URI
+- `meta_threshold_mode` (string) — e.g. `thr_valid_recall_ge_0_90` | `thr_valid_recall_ge_0_95` | `thr_valid_precision_ge_0_70`
+- `meta_latency_ms` (int)
+
+Scores/threshold/decision:
+- `score_fraud_prob` (float in [0,1])
+- `thr_fraud` (float in [0,1])
+- `decision_fraud` (string) — `LOW_FRAUD` | `HIGH_FRAUD`
+
+## RISK_T4 — PAYOFF (v0.1)
+
+### Output payload (exact fields v0.1)
+**Schema version:** `risk_decision_t4_v0_1`
+
+Required:
+- `meta_schema_version` (string) = `risk_decision_t4_v0_1`
+- `meta_generated_at` (ISO-8601 UTC)
+- `meta_request_id` (string|null)
+- `meta_client_id` (string)
+- `meta_model_tag` (string) — e.g. `t4_payoff_xgb_v1_guarded`
+- `meta_model_file` (string) — path or logical URI
+- `meta_threshold_mode` (string) — e.g. `thr_valid_best_f1` | `thr_valid_recall_ge_0_90` | `thr_valid_recall_ge_0_95`
+- `meta_latency_ms` (int)
+
+Scores/threshold/decision:
+- `score_payoff_prob` (float in [0,1]) — P(TARGET_PAYOFF=1)
+- `thr_payoff` (float in [0,1])
+- `decision_payoff` (string) — `LOW_PAYOFF_RISK` | `HIGH_PAYOFF_RISK`
+
+<!-- RISK_T4_PAYOFF_BLOCK_START -->
+## RISK_T4 — PAYOFF (v0.1)
+
+### Output payload (exact fields v0.1)
+**Schema version:** `risk_decision_t4_v0_1`
+
+Required:
+- `meta_schema_version` (string) = `risk_decision_t4_v0_1`
+- `meta_generated_at` (ISO-8601 UTC)
+- `meta_request_id` (string|null)
+- `meta_client_id` (string)
+- `meta_model_tag` (string) — e.g. `t4_payoff_xgb_v1_guarded`
+- `meta_model_file` (string) — path or logical URI
+- `meta_threshold_mode` (string) — e.g. `thr_valid_best_f1` | `thr_valid_recall_ge_0_90` | `thr_valid_recall_ge_0_95`
+- `meta_latency_ms` (int)
+
+Scores/threshold/decision:
+- `score_payoff_prob` (float in [0,1])
+- `thr_payoff` (float in [0,1])
+- `decision_payoff` (string) — `LOW_PAYOFF` | `HIGH_PAYOFF`
+<!-- RISK_T4_PAYOFF_BLOCK_END -->
+

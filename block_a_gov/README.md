@@ -11,3 +11,5 @@ Rule: .md governs; runtime can be swapped without breaking contracts.
 
 ## Specs (v0.1)
 - spec/decision_pack_v0_1.md — Decision Pack contract + RISK_T2 payload
+
+- spec/risk_decision_t4_v0_1.md — T4 runner output contract (risk_decision_t4_v0_1)
