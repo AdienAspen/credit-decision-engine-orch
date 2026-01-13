@@ -5,6 +5,20 @@
 # - Applies operating threshold (OP_A or OP_B) from operating_pick.json
 # - Emits risk_decision_t2_v0_1 payload (Decision Pack compatible)
 
+
+
+def _normalize_op_name(x: str) -> str:
+    if x is None:
+        return x
+    v = str(x).strip()
+    if not v:
+        return v
+    v_up = v.upper()
+    if v_up == "OP_A":
+        return "op_a"
+    if v_up == "OP_B":
+        return "op_b"
+    return v.lower()
 import argparse
 import json
 import time
@@ -161,6 +175,10 @@ def main() -> int:
     n_features = infer_feature_dim(booster)
 
     op_pick = read_json(op_path)
+    # Normalize operating point naming (accept OP_A/OP_B as well as op_a/op_b)
+    if hasattr(args, "op") and args.op is not None:
+        args.op = _normalize_op_name(args.op)
+
     op_sel = select_op_block(op_pick, args.op)
     op_key = op_sel["key"]
     op_block = op_sel["block"]
