@@ -31,3 +31,26 @@ python3 runners/runner_t2.py --client-id 100001 --seed 42 | head
 python3 runners/runner_t3.py --client-id 100001 --seed 42 | head
 python3 runners/runner_t4.py --client-id 100001 --seed 42 | head
 
+Milestone (S1.4): ORIGINATE MVP assembles Decision Pack v0.1 with end-to-end traceability (single request_id) and T2/T3/T4 sub-agents decoupled via canonical aliases.
+
+
+## ORIGINATE wiring (v0.1) — inputs / outputs (text diagram)
+
+
+Eligibility (Gate 0)
+└─ eligibility_signal_v0_1 (start/stop / minimal request validity)
+|
+v
+ORIGINATE (core orchestrator)
+Inputs:
+A) decision_pack_v0_1 (T2/T3/T4 runner outputs via canonical aliases)
+B) sensor_pack_v0_1 (dynamic sensors: market/behavior/device/bureau, etc.)
+C) brms_flags_v0_1 (Block B rules/gates/warnings fetched via API/MCP)
+D) request_context_v0_1 (meta: request_id, client_id, trace, timestamps)
+
+Output:
+final_decision_v0_1 ──> REPORTER input payload (narrative + audit-ready summary)
+Notes:
+- ORIGINATE is the integration brain: it **consumes** signals from A (ML), sensors, and B (BRMS rules).
+- Block B is not fed by Block A; Block B is queried by ORIGINATE for business-rule signals.
+
