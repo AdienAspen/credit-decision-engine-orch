@@ -18,6 +18,22 @@ def run_json(cmd: list) -> Dict[str, Any]:
     out = subprocess.check_output(cmd, text=True)
     return json.loads(out)
 
+def fetch_brms_flags(brms_url: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    # Minimal HTTP client (MVP). Block B returns brms_flags_v0_1.
+    try:
+        import requests
+    except Exception as e:
+        raise RuntimeError("requests is required for BRMS bridge (pip install requests)") from e
+
+    t0 = time.time()
+    r = requests.post(brms_url, json=payload, timeout=10)
+    r.raise_for_status()
+    out = r.json()
+    # If BRMS does not include latency, add it here (non-breaking additive for our internal use).
+    if isinstance(out, dict) and "meta_latency_ms" not in out:
+        out["meta_latency_ms"] = int((time.time() - t0) * 1000)
+    return out
+
 
 def main() -> int:
     ap = argparse.ArgumentParser()
@@ -25,11 +41,15 @@ def main() -> int:
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--request-id", default=None)
     ap.add_argument("--out", default=None, help="Optional path to write decision_pack json")
+    ap.add_argument("--brms-url", default="http://localhost:8082/bridge/brms_flags", help="BRMS flags endpoint (Block B -> ORIGINATE)")
+    ap.add_argument("--no-brms", action="store_true", help="Skip BRMS call (offline mode)")
     args = ap.parse_args()
 
     t0 = time.time()
     request_id = args.request_id or str(uuid.uuid4())
 
+
+    brms_flags = None
     # Sub-agents (local CLIs). Each runner reads its canonical alias by default.
     t2 = run_json(["python3", "runners/runner_t2.py", "--client-id", str(args.client_id), "--seed", str(args.seed), "--request-id", request_id])
     t3 = run_json(["python3", "runners/runner_t3.py", "--client-id", str(args.client_id), "--seed", str(args.seed), "--request-id", request_id])
@@ -49,6 +69,9 @@ def main() -> int:
             "t4_payoff": t4
         }
     }
+
+    if brms_flags is not None:
+        pack["decisions"]["brms_flags"] = brms_flags
 
     if args.out:
         with open(args.out, "w", encoding="utf-8") as f:
