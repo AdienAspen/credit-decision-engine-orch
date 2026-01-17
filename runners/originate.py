@@ -5,8 +5,10 @@ import argparse
 import json
 import subprocess
 import time
+import sys
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict
 
 
@@ -24,7 +26,6 @@ def fetch_brms_flags(brms_url: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         import requests
     except Exception as e:
         raise RuntimeError("requests is required for BRMS bridge (pip install requests)") from e
-
     t0 = time.time()
     r = requests.post(brms_url, json=payload, timeout=10)
     r.raise_for_status()
@@ -42,18 +43,19 @@ def main() -> int:
     ap.add_argument("--request-id", default=None)
     ap.add_argument("--out", default=None, help="Optional path to write decision_pack json")
     ap.add_argument("--brms-url", default="http://localhost:8082/bridge/brms_flags", help="BRMS flags endpoint (Block B -> ORIGINATE)")
+    ap.add_argument("--brms-stub", default=None, help="Path to brms_flags_v0_1 JSON (offline stub)")
     ap.add_argument("--no-brms", action="store_true", help="Skip BRMS call (offline mode)")
     args = ap.parse_args()
-
     t0 = time.time()
     request_id = args.request_id or str(uuid.uuid4())
-
-
     brms_flags = None
+    if args.brms_stub:
+        brms_flags = json.loads(Path(args.brms_stub).read_text(encoding="utf-8"))
+        args.no_brms = True
     # Sub-agents (local CLIs). Each runner reads its canonical alias by default.
-    t2 = run_json(["python3", "runners/runner_t2.py", "--client-id", str(args.client_id), "--seed", str(args.seed), "--request-id", request_id])
-    t3 = run_json(["python3", "runners/runner_t3.py", "--client-id", str(args.client_id), "--seed", str(args.seed), "--request-id", request_id])
-    t4 = run_json(["python3", "runners/runner_t4.py", "--client-id", str(args.client_id), "--seed", str(args.seed), "--request-id", request_id])
+    t2 = run_json([sys.executable, "runners/runner_t2.py", "--client-id", str(args.client_id), "--seed", str(args.seed), "--request-id", request_id])
+    t3 = run_json([sys.executable, "runners/runner_t3.py", "--client-id", str(args.client_id), "--seed", str(args.seed), "--request-id", request_id])
+    t4 = run_json([sys.executable, "runners/runner_t4.py", "--client-id", str(args.client_id), "--seed", str(args.seed), "--request-id", request_id])
 
     latency_ms = int((time.time() - t0) * 1000)
 
