@@ -54,3 +54,6 @@ Notes:
 - ORIGINATE is the integration brain: it **consumes** signals from A (ML), sensors, and B (BRMS rules).
 - Block B is not fed by Block A; Block B is queried by ORIGINATE for business-rule signals.
 
+
+## Smoke (online BRMS)
+python3 runners/originate.py --client-id 100001 --seed 42 --brms-url http://localhost:8090/bridge/brms_flags | grep -n "brms_flags"
