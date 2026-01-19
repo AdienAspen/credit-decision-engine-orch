@@ -70,7 +70,22 @@ def main() -> int:
             "t3_fraud": t3,
             "t4_payoff": t4
         }
-    }
+      }
+
+
+    # BRMS bridge (online) — fail-open (MVP)
+    if (not args.no_brms) and args.brms_url:
+        try:
+            brms_payload = {
+                "meta_request_id": request_id,
+                "meta_client_id": str(args.client_id),
+                "Applicant": {},
+                "Loan": {},
+                "Context": {"policy_id": "P1", "policy_version": "1.0", "validation_mode": "TEST"}
+            }
+            brms_flags = fetch_brms_flags(args.brms_url, brms_payload)
+        except Exception as e:
+            brms_flags = None
 
     if brms_flags is not None:
         pack["decisions"]["brms_flags"] = brms_flags
