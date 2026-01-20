@@ -36,6 +36,34 @@ def fetch_brms_flags(brms_url: str, payload: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
+
+def load_brms_policy_snapshot() -> Dict[str, Any]:
+    """
+    Stable policy snapshot (spec-first) loaded from canonical alias JSON.
+    This avoids coupling ORIGINATE to the bridge internals.
+    """
+    alias_path = Path("block_a_gov/artifacts/brms_policy_canonical.json")
+    if not alias_path.exists():
+        return {
+            "schema_version": "brms_policy_snapshot_v0_1",
+            "status": "MISSING_ALIAS",
+            "alias_path": str(alias_path),
+        }
+
+    d = json.loads(alias_path.read_text(encoding="utf-8"))
+    bridge = d.get("bridge", {}) or {}
+
+    return {
+        "schema_version": "brms_policy_snapshot_v0_1",
+        "status": "OK",
+        "alias_name": d.get("alias_name"),
+        "policy_id": d.get("policy_id"),
+        "policy_version": d.get("policy_version"),
+        "brms_flags_schema_version": d.get("brms_flags_schema_version"),
+        "bridge_base_url": bridge.get("base_url"),
+        "bridge_endpoint": bridge.get("endpoint"),
+    }
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--client-id", required=True)
@@ -72,6 +100,9 @@ def main() -> int:
         }
       }
 
+    # BRMS policy snapshot (stable indirection; loaded from canonical alias)
+    pack["meta_brms_policy_snapshot"] = load_brms_policy_snapshot()
+
 
     # BRMS bridge (online) — fail-open (MVP)
     if (not args.no_brms) and args.brms_url:
@@ -79,9 +110,9 @@ def main() -> int:
             brms_payload = {
                 "meta_request_id": request_id,
                 "meta_client_id": str(args.client_id),
-                "Applicant": {},
-                "Loan": {},
-                "Context": {"policy_id": "P1", "policy_version": "1.0", "validation_mode": "TEST"}
+                "applicant": {"age": 30, "fico_credit_score": 700, "dti": 0.2, "employment_status": "EMPLOYED"},
+                "loan": {"loan_amount": 10000, "loan_term_months": 36},
+                "context": {"policy_id": "P1", "policy_version": "1.0", "validation_mode": "TEST"}
             }
             brms_flags = fetch_brms_flags(args.brms_url, brms_payload)
         except Exception as e:

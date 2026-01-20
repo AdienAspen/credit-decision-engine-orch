@@ -1,0 +1,20 @@
+{
+  "artifact_kind": "brms_policy_alias",
+  "alias_name": "brms_policy_canonical",
+  "schema_version": "brms_policy_alias_v0_1",
+  "brms_flags_schema_version": "brms_flags_v0_1",
+
+  "policy_id": "P1",
+  "policy_version": "1.0",
+
+  "bridge": {
+    "base_url": "http://localhost:8090",
+    "endpoint": "/bridge/brms_flags",
+    "timeout_ms": 2000,
+    "retries": 0
+  },
+
+  "notes": {
+    "contract_doc": "block_a_gov/contracts/brms_flags_v0_1.md"
+  }
+}
