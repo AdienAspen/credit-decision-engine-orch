@@ -99,6 +99,13 @@ def main() -> int:
     prob = score_prob(booster, seed=args.seed)
     dec = decision_from_threshold(prob, thr)
 
+    # PolicyDecider signal (normalized fraud band)
+    if prob >= thr:
+        decision_fraud_norm = "HIGH_FRAUD"
+    elif prob >= (0.5 * thr):
+        decision_fraud_norm = "REVIEW_FRAUD"
+    else:
+        decision_fraud_norm = "LOW_FRAUD"
     latency_ms = int(round((time.time() - t0) * 1000.0))
 
     payload: Dict[str, Any] = {
@@ -113,6 +120,7 @@ def main() -> int:
         "score_fraud_prob": float(prob),
         "thr_fraud": float(thr),
         "decision_fraud": dec,
+        "decision_fraud_norm": decision_fraud_norm,
     }
 
     print(json.dumps(payload, indent=2, sort_keys=False))
