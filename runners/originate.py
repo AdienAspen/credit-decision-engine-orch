@@ -9,7 +9,7 @@ import sys
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 
 def utc_now_iso() -> str:
@@ -63,6 +63,74 @@ def load_brms_policy_snapshot() -> Dict[str, Any]:
         "bridge_base_url": bridge.get("base_url"),
         "bridge_endpoint": bridge.get("endpoint"),
     }
+
+def policy_decider_v0_1(
+    *,
+    decision_pack: Dict[str, Any],
+    brms_flags: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """
+    Deterministic Policy Engine (MVP) — pure function.
+    No HTTP, no file I/O, no LLM, no narrative.
+    """
+    now = utc_now_iso()
+    request_id = (decision_pack or {}).get("meta_request_id", "unknown")
+    client_id = (decision_pack or {}).get("meta_client_id", "unknown")
+
+    snap = (decision_pack or {}).get("meta_brms_policy_snapshot", {}) or {}
+    policy_id = snap.get("policy_id", "unknown")
+    policy_version = snap.get("policy_version", "unknown")
+    validation_mode = "unknown"
+    if brms_flags:
+        policy_id = brms_flags.get("meta_policy_id", policy_id)
+        policy_version = brms_flags.get("meta_policy_version", policy_version)
+        validation_mode = brms_flags.get("meta_validation_mode", validation_mode)
+
+    final_outcome = "REVIEW"
+    reason_code = "MISSING_SIGNALS"
+    dominant_signals: list = []
+    required_docs: list = []
+    warnings: list = []
+    overrides_applied: list = []
+
+    if not brms_flags:
+        warnings.append("BRMS_UNAVAILABLE_FAIL_OPEN")
+
+    d = (decision_pack or {}).get("decisions", {}) or {}
+    t3 = d.get("t3_fraud", {}) or {}
+    t3_norm = t3.get("decision_fraud_norm")
+
+    if t3_norm == "HIGH_FRAUD":
+        final_outcome = "REJECT"
+        reason_code = "FRAUD_HARD_BLOCK"
+        dominant_signals = ["T3_HIGH_FRAUD"]
+    elif t3_norm == "REVIEW_FRAUD":
+        final_outcome = "REVIEW"
+        reason_code = "FRAUD_REVIEW"
+        dominant_signals = ["T3_REVIEW_FRAUD"]
+    elif t3_norm == "LOW_FRAUD":
+        final_outcome = "REVIEW"
+        reason_code = "MVP_REVIEW_DEFAULT"
+        dominant_signals = ["T3_LOW_FRAUD"]
+    else:
+        warnings.append("T3_FRAUD_NORM_MISSING")
+
+    return {
+        "meta_schema_version": "final_decision_v0_1",
+        "meta_generated_at": now,
+        "meta_request_id": request_id,
+        "meta_client_id": client_id,
+        "meta_policy_id": policy_id,
+        "meta_policy_version": policy_version,
+        "meta_validation_mode": validation_mode,
+        "final_outcome": final_outcome,
+        "final_reason_code": reason_code,
+        "dominant_signals": dominant_signals[:5],
+        "required_docs": required_docs,
+        "warnings": warnings,
+        "overrides_applied": overrides_applied,
+    }
+
 
 def main() -> int:
     ap = argparse.ArgumentParser()
@@ -120,6 +188,11 @@ def main() -> int:
 
     if brms_flags is not None:
         pack["decisions"]["brms_flags"] = brms_flags
+
+    # PolicyDecider v0.1 (pure) — emit final_decision_v0_1
+
+    pack["decisions"]["final_decision"] = policy_decider_v0_1(decision_pack=pack, brms_flags=brms_flags)
+
 
     if args.out:
         with open(args.out, "w", encoding="utf-8") as f:
