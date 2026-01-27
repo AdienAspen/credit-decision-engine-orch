@@ -187,6 +187,14 @@ def main() -> int:
     prob = score_default_prob(booster, n_features=n_features, seed=args.seed)
     decision = "HIGH_RISK" if prob >= thr else "LOW_RISK"
 
+    # Normalized band for PolicyDecider (MVP)
+    if prob >= thr:
+        decision_norm = "HIGH_RISK"
+    elif prob >= 0.5 * thr:
+        decision_norm = "REVIEW_RISK"
+    else:
+        decision_norm = "LOW_RISK"
+
     latency_ms = int((time.time() - t0) * 1000)
 
     payload: Dict[str, Any] = {
@@ -201,6 +209,7 @@ def main() -> int:
         "score_default_prob": prob,
         "thr_default": thr,
         "decision_default": decision,
+        "decision_default_norm": decision_norm,
         "op_ref": {
             "threshold": thr,
             "precision": float(op_block.get("precision")),
@@ -227,6 +236,7 @@ def main() -> int:
           'score_default_prob',
           'thr_default',
           'decision_default',
+            'decision_default_norm',
         ]
         payload = {k: payload.get(k) for k in _STRICT_FIELDS}
 
