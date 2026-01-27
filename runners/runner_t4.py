@@ -206,6 +206,15 @@ def main():
 
     # NOTE: payoff = positive class => HIGH_PAYOFF if prob >= thr
     decision = "HIGH_PAYOFF" if prob >= thr else "LOW_PAYOFF"
+
+    # Normalized band for PolicyDecider (MVP)
+    if prob >= thr:
+        decision_norm = "HIGH_PAYOFF_RISK"
+    elif prob >= 0.5 * thr:
+        decision_norm = "REVIEW_PAYOFF"
+    else:
+        decision_norm = "LOW_PAYOFF_RISK"
+
     latency_ms = int((time.time() - t0) * 1000)
 
     out = {
@@ -220,6 +229,7 @@ def main():
         "score_payoff_prob": float(prob),
         "thr_payoff": float(thr),
         "decision_payoff": decision,
+        "decision_payoff_norm": decision_norm,
     }
     print(json.dumps(out, indent=2))
     return 0
