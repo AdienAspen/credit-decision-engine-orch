@@ -36,7 +36,7 @@ Runners must read **only** these aliases by default:
 
 ## Inventory (live) — status snapshot (2026-01-28)
 
-### 1) ORIGINATE “cara %” — BRMS Bridge (Block B online-ish)
+### 1) ORIGINATE “Function>> as a connector/coordinator” — BRMS Bridge (Block B online-ish)
 - ✅ Bridge server FastAPI running locally (`tools.brms_bridge_server`) with:
   - `GET /health`
   - `POST /bridge/brms_flags` -> `brms_flags_v0_1`
@@ -51,7 +51,7 @@ Recent commits:
 Remaining (cara %):
 - 🔴 Formalize “Block B online” as real service: docker/compose, lifecycle, logs, healthcheck, stable URL/auth.
 
-### 2) ORIGINATE “cara #” — PolicyDecider + FinalDecision (MVP)
+### 2) ORIGINATE “Function >> as a policy supervisor-decision maker” — PolicyDecider + FinalDecision (MVP)
 - ✅ T3 adds `decision_fraud_norm` and contract `risk_decision_t3_v0_1`
 - ✅ T2 adds `decision_default_norm`
 - ✅ T4 adds `decision_payoff_norm`
