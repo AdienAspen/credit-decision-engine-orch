@@ -6,3 +6,6 @@ __pycache__/
 
 # Runtime outputs / fixtures
 reports/
+
+# Local backup artifacts
+*.bak_*
