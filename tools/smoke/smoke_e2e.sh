@@ -64,6 +64,11 @@ JSON
 
 BRMS_LIVE_OK=0
 if command -v curl >/dev/null 2>&1; then
+echo "[SMOKE] probing GET ${BRIDGE_URL%/bridge/brms_flags}/health ..."
+HEALTH_URL="${BRIDGE_URL%/bridge/brms_flags}/health"
+HC=$(curl -s -o /dev/null -w "%{http_code}" "$HEALTH_URL" || true)
+echo "[SMOKE] health http_code=$HC"
+
   echo "[SMOKE] probing POST ${BRIDGE_URL} ..."
   # If KIE is down, this may return 500; we treat that as "live not OK".
   if curl -sS -m 2 -X POST "$BRIDGE_URL" -H "Content-Type: application/json" -d @"$PROBE_PAYLOAD" >/dev/null; then
