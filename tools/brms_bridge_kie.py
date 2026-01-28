@@ -44,30 +44,94 @@ def call_kie_dmn(kie_url: str, user: str, pw: str, dmn_context: Dict[str, Any]) 
 
 
 def to_brms_flags_v0_1(dmn_eval: Dict[str, Any], request_id: str, client_id: str) -> Dict[str, Any]:
-    ctx = dmn_eval["result"]["dmn-evaluation-result"]["dmn-context"]
+    """
+    Convert DMN evaluation result -> brms_flags_v0_1.
+    Robust: tolerate missing/null context AND per-gate shape mismatch (dict/str/bool).
+    """
+    result = (dmn_eval or {}).get("result") or {}
+    dmn_res = (result.get("dmn-evaluation-result") or {})
+    ctx = dmn_res.get("dmn-context")
 
-    gate1_ok = bool(ctx.get("Gate_1_Eligibility", {}).get("eligible", False))
-    gate2_ok = ctx.get("Gate_2_Offer") is not None
-    gate3_ok = (ctx.get("Gate_3_FinalDecision") == "Approved")
+    if not isinstance(ctx, dict):
+        ctx = {}
 
-    out = {
-        "meta_schema_version": "brms_flags_v0_1",
-        "meta_generated_at": utc_now_iso(),
-        "meta_request_id": str(request_id),
-        "meta_client_id": str(client_id),
-        "meta_policy_id": ctx.get("Context", {}).get("policy_id"),
-        "meta_policy_version": ctx.get("Context", {}).get("policy_version"),
-        "meta_validation_mode": ctx.get("Context", {}).get("validation_mode"),
+    def _truthy_str(s: str) -> bool:
+        v = str(s).strip().upper()
+        return v in {"PASS", "APPROVE", "APPROVED", "TRUE", "YES", "OK", "ELIGIBLE"}
+
+    def _as_dict(x: Any) -> Dict[str, Any]:
+        return x if isinstance(x, dict) else {}
+
+    # If context is missing/null, do not crash
+    if not ctx:
+        return {
+            "meta_schema_version": "brms_flags_v0_1",
+            "meta_generated_at": datetime.now(timezone.utc).isoformat(),
+            "meta_request_id": request_id,
+            "meta_client_id": str(client_id),
+            "meta_policy_id": "unknown",
+            "meta_policy_version": "unknown",
+            "meta_validation_mode": "unknown",
+            "meta_latency_ms": 0,
+            "gates": {"gate_1": "UNKNOWN", "gate_2": "UNKNOWN", "gate_3": "UNKNOWN"},
+            "flags": ["BRMS_CONTEXT_MISSING"],
+            "reasons": ["DMN context missing/null; returning UNKNOWN gates (no crash)"],
+        }
+
+    # --- Gate 1: Eligibility ---
+    g1 = ctx.get("Gate_1_Eligibility")
+    if isinstance(g1, dict):
+        gate1_ok = bool(_as_dict(g1).get("eligible", False))
+    elif isinstance(g1, (bool, int)):
+        gate1_ok = bool(g1)
+    elif isinstance(g1, str):
+        gate1_ok = _truthy_str(g1)
+    else:
+        gate1_ok = False
+
+    # --- Gate 2: Offer ---
+    g2 = ctx.get("Gate_2_Offer")
+    if isinstance(g2, dict):
+        # treat "offer" present as PASS
+        gate2_ok = _as_dict(g2).get("offer", None) is not None
+    elif isinstance(g2, str):
+        # sometimes DMN returns PASS/OK or a non-empty offer id
+        gate2_ok = _truthy_str(g2) or (str(g2).strip() not in {"", "NONE", "NULL"})
+    elif isinstance(g2, (bool, int)):
+        gate2_ok = bool(g2)
+    else:
+        gate2_ok = False
+
+    # --- Gate 3: Final decision ---
+    g3 = ctx.get("Gate_3_FinalDecision")
+    if isinstance(g3, dict):
+        gate3_ok = bool(_as_dict(g3).get("approved", False))
+    elif isinstance(g3, str):
+        gate3_ok = _truthy_str(g3)
+    elif isinstance(g3, (bool, int)):
+        gate3_ok = bool(g3)
+    else:
+        gate3_ok = False
+
+    gates = {
         "gate_1": "PASS" if gate1_ok else "BLOCK",
         "gate_2": "PASS" if gate2_ok else "BLOCK",
         "gate_3": "PASS" if gate3_ok else "BLOCK",
-        "warnings": [],
-        "overrides": [],
-        "required_docs": [],
     }
-    return out
 
-
+    return {
+        "meta_schema_version": "brms_flags_v0_1",
+        "meta_generated_at": datetime.now(timezone.utc).isoformat(),
+        "meta_request_id": request_id,
+        "meta_client_id": str(client_id),
+        "meta_policy_id": (ctx.get("meta_policy_id") or "unknown"),
+        "meta_policy_version": (ctx.get("meta_policy_version") or "unknown"),
+        "meta_validation_mode": (ctx.get("meta_validation_mode") or "unknown"),
+        "meta_latency_ms": int((dmn_res.get("meta_latency_ms") or 0)),
+        "gates": gates,
+        "flags": [],
+        "reasons": [],
+    }
 def main() -> int:
     if len(sys.argv) != 2:
         print("Usage: brms_bridge_kie.py <brms_eval_request_v0_1.json>", file=sys.stderr)
