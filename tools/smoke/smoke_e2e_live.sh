@@ -2,9 +2,17 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
+# --- Python resolver (prefer project venv; allow override via env PY) ---
+PY="${PY:-python3}"
+VENV_PY="$ROOT/.venv/bin/python3"
+if [[ "$PY" == "python3" && -x "$VENV_PY" ]]; then
+  PY="$VENV_PY"
+fi
+
+
 cd "$ROOT"
 
-PY="${PY:-python3}"
 BRIDGE_PORT="${BRIDGE_PORT:-8090}"
 BRIDGE_URL="http://localhost:${BRIDGE_PORT}/bridge/brms_flags"
 CLIENT_ID="${CLIENT_ID:-100001}"

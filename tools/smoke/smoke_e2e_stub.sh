@@ -2,9 +2,17 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
+# --- Python resolver (prefer project venv; allow override via env PY) ---
+PY="${PY:-python3}"
+VENV_PY="$ROOT/.venv/bin/python3"
+if [[ "$PY" == "python3" && -x "$VENV_PY" ]]; then
+  PY="$VENV_PY"
+fi
+
+
 cd "$ROOT"
 
-PY="${PY:-python3}"
 CLIENT_ID="${CLIENT_ID:-100001}"
 SEED="${SEED:-42}"
 

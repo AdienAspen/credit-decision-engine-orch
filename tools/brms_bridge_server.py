@@ -48,6 +48,17 @@ def bridge_brms_flags(req_payload: Dict[str, Any]) -> Dict[str, Any]:
     t0 = time.time()
     try:
         dmn_eval = call_kie_dmn(kie_url, user, pw, dmn_context)
+        # MARKER: DMN_SNAPSHOT_V0_1
+        # Persist DMN inputs/outputs for debugging (best-effort)
+        try:
+            from pathlib import Path as _Path
+            import json as _json
+            _dir = _Path('tools/smoke/_logs')
+            _dir.mkdir(parents=True, exist_ok=True)
+            _dir.joinpath('last_dmn_context.json').write_text(_json.dumps(dmn_context, indent=2, default=str), encoding='utf-8')
+            _dir.joinpath('last_dmn_eval.json').write_text(_json.dumps(dmn_eval, indent=2, default=str), encoding='utf-8')
+        except Exception:
+            pass
         out = to_brms_flags_v0_1(dmn_eval, request_id, client_id)
         out["meta_latency_ms"] = int((time.time() - t0) * 1000)
         return out
