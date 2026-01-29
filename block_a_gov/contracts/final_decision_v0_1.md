@@ -7,7 +7,7 @@ Single, auditable final outcome computed deterministically by ORIGINATE from:
 - BRMS flags (Block B; optional / fail-open)
 - SensorPack (optional)
 
-This output is **policy-bound** (`policy_id`, `policy_version`) and **traceable** (`request_id`, timestamps).
+This output is **policy-bound** (`meta_policy_id`, `meta_policy_version`) and **traceable** (`request_id`, timestamps).
 
 ## Schema versioning
 - `meta_schema_version` MUST be `"final_decision_v0_1"`.
