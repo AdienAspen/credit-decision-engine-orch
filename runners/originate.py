@@ -123,6 +123,16 @@ def policy_decider_v0_1(
     warnings: list = []
     overrides_applied: list = []
 
+    def _set_review(reason: str, signal: str) -> None:
+        nonlocal final_outcome, reason_code, dominant_signals
+        # Set REVIEW only if we are not already REJECT and reason is still default
+        if final_outcome != "REJECT":
+            if final_outcome != "REVIEW" or reason_code == "MVP_REVIEW_DEFAULT":
+                final_outcome = "REVIEW"
+                reason_code = reason
+            dominant_signals.append(signal)
+
+
     if not brms_flags:
         warnings.append("BRMS_UNAVAILABLE_FAIL_OPEN")
 
@@ -165,26 +175,18 @@ def policy_decider_v0_1(
         t2 = d.get("t2_default", {}) or {}
         t2_norm = t2.get("decision_default_norm") or t2.get("decision_default")
         if t2_norm == "HIGH_RISK":
-            final_outcome = "REVIEW"
-            reason_code = "T2_HIGH_RISK"
-            dominant_signals.append("t2:high_risk")
+            _set_review("T2_HIGH_RISK", "t2:high_risk")
         elif t2_norm == "REVIEW_RISK":
-            final_outcome = "REVIEW"
-            reason_code = "T2_REVIEW_RISK"
-            dominant_signals.append("t2:review_risk")
+            _set_review("T2_REVIEW_RISK", "t2:review_risk")
 
     # 5) Payoff (T4)
     if final_outcome != "REJECT":
         t4 = d.get("t4_payoff", {}) or {}
         t4_norm = t4.get("decision_payoff_norm") or t4.get("decision_payoff")
         if t4_norm == "HIGH_PAYOFF_RISK":
-            final_outcome = "REVIEW"
-            reason_code = "T4_HIGH_PAYOFF_RISK"
-            dominant_signals.append("t4:high_payoff_risk")
+            _set_review("T4_HIGH_PAYOFF_RISK", "t4:high_payoff_risk")
         elif t4_norm == "REVIEW_PAYOFF":
-            final_outcome = "REVIEW"
-            reason_code = "T4_REVIEW_PAYOFF"
-            dominant_signals.append("t4:review_payoff")
+            _set_review("T4_REVIEW_PAYOFF", "t4:review_payoff")
 
     # Approve only when BRMS is present and no concerns were raised
     if final_outcome == "REVIEW" and reason_code == "MVP_REVIEW_DEFAULT":
@@ -205,7 +207,7 @@ def policy_decider_v0_1(
         "validation_mode": str(validation_mode),
         "final_outcome": final_outcome,
         "final_reason_code": reason_code,
-        "dominant_signals": dominant_signals,
+        "dominant_signals": dominant_signals[:5],
         "required_docs": required_docs,
         "warnings": warnings,
         "overrides_applied": overrides_applied,
