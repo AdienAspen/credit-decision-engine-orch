@@ -1,0 +1,13 @@
+{
+  "meta_schema_version": "brms_flags_v0_1",
+  "meta_generated_at": "2026-01-28T00:00:00Z",
+  "meta_request_id": "smoke-stub",
+  "meta_client_id": "100001",
+  "meta_policy_id": "P1",
+  "meta_policy_version": "1.0",
+  "meta_validation_mode": "TEST",
+  "meta_latency_ms": 0,
+  "gates": { "gate_1": "PASS", "gate_2": "PASS", "gate_3": "PASS" },
+  "flags": [],
+  "reasons": []
+}
