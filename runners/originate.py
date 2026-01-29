@@ -178,15 +178,29 @@ def policy_decider_v0_1(
             _set_review("T2_HIGH_RISK", "t2:high_risk")
         elif t2_norm == "REVIEW_RISK":
             _set_review("T2_REVIEW_RISK", "t2:review_risk")
+    # T2-driven outcome/reason => T4 must not become dominant
+    t2_driven = reason_code.startswith("T2_")
 
-    # 5) Payoff (T4)
+    # 5) Payoff (T4) — NON-BLOCKING (margin/offer only)
+    # T4 must NOT change final_outcome/reason_code in v0.1 credit decision.
+    # It may only add secondary dominant_signals and warnings/overrides.
+    # MARKER: T4_NON_BLOCKING_MARGIN_ONLY
     if final_outcome != "REJECT":
         t4 = d.get("t4_payoff", {}) or {}
         t4_norm = t4.get("decision_payoff_norm") or t4.get("decision_payoff")
         if t4_norm == "HIGH_PAYOFF_RISK":
-            _set_review("T4_HIGH_PAYOFF_RISK", "t4:high_payoff_risk")
+            # T4 is non-blocking: only dominant when nothing else set
+            if (not t2_driven) and (reason_code == "MVP_REVIEW_DEFAULT"):
+                dominant_signals.append("t4:high_payoff_risk")
+
+            warnings.append("LOW_MARGIN_RISK_T4")
         elif t4_norm == "REVIEW_PAYOFF":
-            _set_review("T4_REVIEW_PAYOFF", "t4:review_payoff")
+            # T4 is non-blocking: only dominant when nothing else set
+            if (not t2_driven) and (reason_code == "MVP_REVIEW_DEFAULT"):
+                dominant_signals.append("t4:review_payoff")
+
+            warnings.append("MEDIUM_MARGIN_RISK_T4")
+
 
     # Approve only when BRMS is present and no concerns were raised
     if final_outcome == "REVIEW" and reason_code == "MVP_REVIEW_DEFAULT":
