@@ -202,14 +202,44 @@ def policy_decider_v0_1(
             warnings.append("MEDIUM_MARGIN_RISK_T4")
 
 
-    # Approve only when BRMS is present and no concerns were raised
-    if final_outcome == "REVIEW" and reason_code == "MVP_REVIEW_DEFAULT":
+    # Approve only when BRMS is present and gates PASS (strict freeze)
+    # MARKER: APPROVE_STRICT_V0_1
+    if final_outcome == "REVIEW" and reason_code == "MVP_REVIEW_DEFAULT" and (not t2_driven):
         if brms_flags is None:
             final_outcome = "REVIEW"
             reason_code = "BRMS_UNAVAILABLE_FAIL_OPEN"
         else:
-            final_outcome = "APPROVE"
-            reason_code = "ALL_CLEAR"
+            # Normalize BRMS flags shape (bridge may wrap payload)
+            bf = brms_flags
+            if isinstance(bf, dict) and "gates" not in bf:
+                for k in ("brms_flags_v0_1", "brms_flags", "payload", "data"):
+                    v = bf.get(k)
+                    if isinstance(v, dict) and ("gates" in v or "flags" in v or "reasons" in v):
+                        bf = v
+                        break
+
+            gates = bf.get("gates") if isinstance(bf, dict) else None
+
+            def _is_pass_like(x):
+                s = str(x).strip().upper()
+                return s in ("PASS", "OK", "ALLOW", "APPROVE")
+
+            brms_all_pass = False
+            if isinstance(gates, dict) and gates:
+                statuses = []
+                for _, gv in gates.items():
+                    if isinstance(gv, dict):
+                        statuses.append(gv.get("status"))
+                    else:
+                        statuses.append(gv)
+                brms_all_pass = all((st is not None and _is_pass_like(st)) for st in statuses)
+
+            if not brms_all_pass:
+                final_outcome = "REVIEW"
+                reason_code = "APPROVE_BLOCKED_BY_STRICT_RULE"
+            else:
+                final_outcome = "APPROVE"
+                reason_code = "ALL_CLEAR"
 
     return {
         "meta_schema_version": "final_decision_v0_1",
@@ -281,6 +311,15 @@ def main() -> int:
                 "context": {"policy_id": "P1", "policy_version": "1.0", "validation_mode": "TEST"}
             }
             brms_flags = fetch_brms_flags(args.brms_url, brms_payload)
+            # MARKER: BRMS_FLAGS_SNAPSHOT_V0_1
+            # Persist BRMS flags snapshot for E2E debugging (best-effort)
+            try:
+                from pathlib import Path as _Path
+                import json as _json
+                _Path('tools/smoke/_logs').mkdir(parents=True, exist_ok=True)
+                _Path('tools/smoke/_logs/last_brms_flags.json').write_text(_json.dumps(brms_flags, indent=2, default=str), encoding='utf-8')
+            except Exception:
+                pass
         except Exception as e:
             brms_flags = None
 

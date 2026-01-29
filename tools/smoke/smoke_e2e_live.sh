@@ -103,6 +103,7 @@ JSON
 echo "[SMOKE] running originate..."
 OUT_JSON="$(mktemp)"
 
+
 if [[ "$BRMS_LIVE_OK" -eq 1 ]]; then
   "$PY" runners/originate.py --client-id "$CLIENT_ID" --seed "$SEED" --brms-url "$BRIDGE_URL" > "$OUT_JSON"
 else
