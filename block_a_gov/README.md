@@ -40,7 +40,7 @@ Runners must read **only** these aliases by default:
 - ✅ Bridge server FastAPI running locally (`tools.brms_bridge_server`) with:
   - `GET /health`
   - `POST /bridge/brms_flags` -> `brms_flags_v0_1`
-- ✅ Smoke E2E script available: `tools/smoke/smoke_e2e.sh`
+- ✅ Smoke E2E script available: `tools/smoke/smoke_e2e_live.sh` (integration) and `tools/smoke/smoke_e2e_stub.sh` (deterministic offline)
 - ✅ Robust BRMS flags mapping against DMN gate shape variations (dict/str/null)
 
 Recent commits:
