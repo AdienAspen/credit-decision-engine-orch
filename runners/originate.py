@@ -64,14 +64,44 @@ def load_brms_policy_snapshot() -> Dict[str, Any]:
         "bridge_endpoint": bridge.get("endpoint"),
     }
 
+
+def _a_summary_from_pack(pack: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Produce a minimal A summary for auditing.
+    Keep it stable and small; do not leak full runner payloads.
+    """
+    d = (pack or {}).get("decisions", {}) or {}
+    t2 = d.get("t2_default", {}) or {}
+    t3 = d.get("t3_fraud", {}) or {}
+    t4 = d.get("t4_payoff", {}) or {}
+
+    return {
+        "t2_default": t2.get("decision_default_norm", t2.get("decision_default", "UNKNOWN")),
+        "t3_fraud": t3.get("decision_fraud_norm", t3.get("decision_fraud", "UNKNOWN")),
+        "t4_payoff": t4.get("decision_payoff_norm", t4.get("decision_payoff", "UNKNOWN")),
+    }
+
+
+def _b_summary_from_flags(brms_flags: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    if not brms_flags:
+        return None
+    gates = brms_flags.get("gates", {}) or {}
+    return {
+        "gate_1": gates.get("gate_1"),
+        "gate_2": gates.get("gate_2"),
+        "gate_3": gates.get("gate_3"),
+    }
+
+
 def policy_decider_v0_1(
     *,
     decision_pack: Dict[str, Any],
     brms_flags: Optional[Dict[str, Any]],
 ) -> Dict[str, Any]:
     """
-    Deterministic Policy Engine (MVP) — pure function.
-    No HTTP, no file I/O, no LLM, no narrative.
+    Deterministic Policy Engine (v0.1) — pure function.
+    Priority pyramid:
+      Eligibility > BRMS hard blocks > Fraud > Default > Payoff
     """
     now = utc_now_iso()
     request_id = (decision_pack or {}).get("meta_request_id", "unknown")
@@ -87,7 +117,7 @@ def policy_decider_v0_1(
         validation_mode = brms_flags.get("meta_validation_mode", validation_mode)
 
     final_outcome = "REVIEW"
-    reason_code = "MISSING_SIGNALS"
+    reason_code = "MVP_REVIEW_DEFAULT"
     dominant_signals: list = []
     required_docs: list = []
     warnings: list = []
@@ -97,38 +127,90 @@ def policy_decider_v0_1(
         warnings.append("BRMS_UNAVAILABLE_FAIL_OPEN")
 
     d = (decision_pack or {}).get("decisions", {}) or {}
-    t3 = d.get("t3_fraud", {}) or {}
-    t3_norm = t3.get("decision_fraud_norm")
 
-    if t3_norm == "HIGH_FRAUD":
+    # 1) Eligibility (if present) veto
+    elig = d.get("eligibility", {}) or {}
+    elig_status = elig.get("eligibility_status") or elig.get("decision_eligibility") or elig.get("status")
+    if isinstance(elig_status, str) and elig_status.upper() in {"INELIGIBLE", "REJECT", "BLOCK"}:
         final_outcome = "REJECT"
-        reason_code = "FRAUD_HARD_BLOCK"
-        dominant_signals = ["T3_HIGH_FRAUD"]
-    elif t3_norm == "REVIEW_FRAUD":
-        final_outcome = "REVIEW"
-        reason_code = "FRAUD_REVIEW"
-        dominant_signals = ["T3_REVIEW_FRAUD"]
-    elif t3_norm == "LOW_FRAUD":
-        final_outcome = "REVIEW"
-        reason_code = "MVP_REVIEW_DEFAULT"
-        dominant_signals = ["T3_LOW_FRAUD"]
-    else:
-        warnings.append("T3_FRAUD_NORM_MISSING")
+        reason_code = "ELIGIBILITY_FAIL"
+        dominant_signals.append("eligibility:fail")
+
+    # 2) BRMS hard blocks veto
+    if final_outcome != "REJECT" and brms_flags:
+        gates = brms_flags.get("gates", {}) or {}
+        g1, g2, g3 = gates.get("gate_1"), gates.get("gate_2"), gates.get("gate_3")
+        if any(x == "FAIL" for x in [g1, g2, g3]):
+            final_outcome = "REJECT"
+            reason_code = "BRMS_GATE_FAIL"
+            if g1 == "FAIL": dominant_signals.append("brms:gate_1_fail")
+            if g2 == "FAIL": dominant_signals.append("brms:gate_2_fail")
+            if g3 == "FAIL": dominant_signals.append("brms:gate_3_fail")
+
+    # 3) Fraud (T3)
+    if final_outcome != "REJECT":
+        t3 = d.get("t3_fraud", {}) or {}
+        fraud_norm = t3.get("decision_fraud_norm") or t3.get("decision_fraud")
+        if fraud_norm == "HIGH_FRAUD":
+            final_outcome = "REJECT"
+            reason_code = "T3_HIGH_FRAUD_VETO"
+            dominant_signals.append("t3:high_fraud")
+        elif fraud_norm == "REVIEW_FRAUD":
+            final_outcome = "REVIEW"
+            reason_code = "T3_REVIEW_FRAUD"
+            dominant_signals.append("t3:review_fraud")
+
+    # 4) Default risk (T2)
+    if final_outcome != "REJECT":
+        t2 = d.get("t2_default", {}) or {}
+        t2_norm = t2.get("decision_default_norm") or t2.get("decision_default")
+        if t2_norm == "HIGH_RISK":
+            final_outcome = "REVIEW"
+            reason_code = "T2_HIGH_RISK"
+            dominant_signals.append("t2:high_risk")
+        elif t2_norm == "REVIEW_RISK":
+            final_outcome = "REVIEW"
+            reason_code = "T2_REVIEW_RISK"
+            dominant_signals.append("t2:review_risk")
+
+    # 5) Payoff (T4)
+    if final_outcome != "REJECT":
+        t4 = d.get("t4_payoff", {}) or {}
+        t4_norm = t4.get("decision_payoff_norm") or t4.get("decision_payoff")
+        if t4_norm == "HIGH_PAYOFF_RISK":
+            final_outcome = "REVIEW"
+            reason_code = "T4_HIGH_PAYOFF_RISK"
+            dominant_signals.append("t4:high_payoff_risk")
+        elif t4_norm == "REVIEW_PAYOFF":
+            final_outcome = "REVIEW"
+            reason_code = "T4_REVIEW_PAYOFF"
+            dominant_signals.append("t4:review_payoff")
+
+    # Approve only when BRMS is present and no concerns were raised
+    if final_outcome == "REVIEW" and reason_code == "MVP_REVIEW_DEFAULT":
+        if brms_flags is None:
+            final_outcome = "REVIEW"
+            reason_code = "BRMS_UNAVAILABLE_FAIL_OPEN"
+        else:
+            final_outcome = "APPROVE"
+            reason_code = "ALL_CLEAR"
 
     return {
         "meta_schema_version": "final_decision_v0_1",
         "meta_generated_at": now,
         "meta_request_id": request_id,
-        "meta_client_id": client_id,
-        "meta_policy_id": policy_id,
-        "meta_policy_version": policy_version,
-        "meta_validation_mode": validation_mode,
+        "meta_client_id": str(client_id),
+        "policy_id": str(policy_id),
+        "policy_version": str(policy_version),
+        "validation_mode": str(validation_mode),
         "final_outcome": final_outcome,
         "final_reason_code": reason_code,
-        "dominant_signals": dominant_signals[:5],
+        "dominant_signals": dominant_signals,
         "required_docs": required_docs,
         "warnings": warnings,
         "overrides_applied": overrides_applied,
+        "a_summary": _a_summary_from_pack(decision_pack),
+        "b_summary": _b_summary_from_flags(brms_flags),
     }
 
 
