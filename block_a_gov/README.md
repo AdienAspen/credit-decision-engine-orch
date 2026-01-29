@@ -41,6 +41,8 @@ Runners must read **only** these aliases by default:
   - `GET /health`
   - `POST /bridge/brms_flags` -> `brms_flags_v0_1`
 - ✅ Smoke E2E script available: `tools/smoke/smoke_e2e_live.sh` (integration) and `tools/smoke/smoke_e2e_stub.sh` (deterministic offline)
+  - ✅ Evidence snapshots (latest): `tools/smoke/_logs/last_dmn_context.json`, `tools/smoke/_logs/last_dmn_eval.json`, `tools/smoke/_logs/last_brms_flags.json`
+  - ✅ Milestone tag: `milestone_cara_hash_smokes_green_v0_1`
 - ✅ Robust BRMS flags mapping against DMN gate shape variations (dict/str/null)
 
 Recent commits:
