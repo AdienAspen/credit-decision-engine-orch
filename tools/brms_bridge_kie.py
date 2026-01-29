@@ -92,8 +92,11 @@ def to_brms_flags_v0_1(dmn_eval: Dict[str, Any], request_id: str, client_id: str
     # --- Gate 2: Offer ---
     g2 = ctx.get("Gate_2_Offer")
     if isinstance(g2, dict):
-        # treat "offer" present as PASS
-        gate2_ok = _as_dict(g2).get("offer", None) is not None
+        d2 = _as_dict(g2)
+        # DMN often returns assigned_rate/tier (no "offer" key). Treat non-empty dict as PASS.
+        gate2_ok = any(d2.get(k) is not None for k in ("offer", "assigned_rate", "tier", "apr", "rate"))
+        if not gate2_ok:
+            gate2_ok = bool(d2)
     elif isinstance(g2, str):
         # sometimes DMN returns PASS/OK or a non-empty offer id
         gate2_ok = _truthy_str(g2) or (str(g2).strip() not in {"", "NONE", "NULL"})
@@ -124,9 +127,9 @@ def to_brms_flags_v0_1(dmn_eval: Dict[str, Any], request_id: str, client_id: str
         "meta_generated_at": datetime.now(timezone.utc).isoformat(),
         "meta_request_id": request_id,
         "meta_client_id": str(client_id),
-        "meta_policy_id": (ctx.get("meta_policy_id") or "unknown"),
-        "meta_policy_version": (ctx.get("meta_policy_version") or "unknown"),
-        "meta_validation_mode": (ctx.get("meta_validation_mode") or "unknown"),
+        "meta_policy_id": (_as_dict(ctx.get("Context")).get("policy_id") or "unknown"),
+        "meta_policy_version": (_as_dict(ctx.get("Context")).get("policy_version") or "unknown"),
+        "meta_validation_mode": (_as_dict(ctx.get("Context")).get("validation_mode") or "unknown"),
         "meta_latency_ms": int((dmn_res.get("meta_latency_ms") or 0)),
         "gates": gates,
         "flags": [],
