@@ -10,6 +10,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
+from contract_validate import validate_required, REQUIRED_T2_V0_1, REQUIRED_T3_V0_1, REQUIRED_T4_V0_1
 
 
 def utc_now_iso() -> str:
@@ -278,8 +279,11 @@ def main() -> int:
         args.no_brms = True
     # Sub-agents (local CLIs). Each runner reads its canonical alias by default.
     t2 = run_json([sys.executable, "runners/runner_t2.py", "--client-id", str(args.client_id), "--seed", str(args.seed), "--request-id", request_id])
+    validate_required(t2, REQUIRED_T2_V0_1, where="originate:t2_default")
     t3 = run_json([sys.executable, "runners/runner_t3.py", "--client-id", str(args.client_id), "--seed", str(args.seed), "--request-id", request_id])
+    validate_required(t3, REQUIRED_T3_V0_1, where="originate:t3_fraud")
     t4 = run_json([sys.executable, "runners/runner_t4.py", "--client-id", str(args.client_id), "--seed", str(args.seed), "--request-id", request_id])
+    validate_required(t4, REQUIRED_T4_V0_1, where="originate:t4_payoff")
 
     latency_ms = int((time.time() - t0) * 1000)
 

@@ -1,6 +1,13 @@
 #!/usr/bin/env python3
 import argparse, json, time
 from datetime import datetime, timezone
+
+from pathlib import Path
+import sys
+_THIS_DIR = Path(__file__).resolve().parent
+if str(_THIS_DIR) not in sys.path:
+    sys.path.insert(0, str(_THIS_DIR))
+from contract_validate import validate_required, REQUIRED_T4_V0_1
 from pathlib import Path
 
 import numpy as np

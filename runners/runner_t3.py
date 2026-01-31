@@ -7,6 +7,11 @@ import time
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Tuple
 
+import os
+import sys
+sys.path.insert(0, os.path.dirname(__file__))
+from contract_validate import validate_required, REQUIRED_T3_V0_1
+
 from pathlib import Path
 import numpy as np
 import xgboost as xgb
@@ -186,6 +191,9 @@ def main() -> int:
         "decision_fraud": dec,
         "decision_fraud_norm": decision_fraud_norm,
     }
+
+    # Minimal contract validation (v0.1)
+    validate_required(payload, REQUIRED_T3_V0_1)
 
     print(json.dumps(payload, indent=2, sort_keys=False))
     return 0

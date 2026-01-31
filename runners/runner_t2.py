@@ -26,6 +26,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+from pathlib import Path
+import sys
+_THIS_DIR = Path(__file__).resolve().parent
+if str(_THIS_DIR) not in sys.path:
+    sys.path.insert(0, str(_THIS_DIR))
+from contract_validate import validate_required, REQUIRED_T2_V0_1
+
 def load_json(p: Path):
     return json.loads(Path(p).read_text(encoding="utf-8"))
 
