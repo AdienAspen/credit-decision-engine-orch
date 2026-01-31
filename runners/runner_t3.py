@@ -7,6 +7,7 @@ import time
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Tuple
 
+from pathlib import Path
 import numpy as np
 import xgboost as xgb
 
@@ -15,6 +16,7 @@ DEFAULT_MODEL_FILE = "/home/adien/loan_backbone_ml_T3_FRAUD/models/fraud_t3_ieee
 DEFAULT_THRESHOLDS_ALIAS = "/home/adien/loan_backbone_ml_T3_FRAUD/reports/fraud_t3_ieee_bcd_best_thresholds.json"
 
 
+DEFAULT_CANONICAL_ALIAS = "/home/adien/loan_backbone_ml_BLOCK_A_AGENTS/block_a_gov/artifacts/t3_fraud_canonical.json"
 def utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -22,6 +24,53 @@ def utc_now_iso() -> str:
 def load_json(path: str) -> Dict[str, Any]:
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
+
+
+def load_canonical_alias(alias_path: str) -> Dict[str, str]:
+    """
+    Read canonical alias JSON (gov-layer). Tolerate shape variations.
+    Current expected shape:
+      { "model": {"model_tag": "...", "model_file": "..."}, "thresholds": {"thresholds_file": "..."} }
+    """
+    ap = Path(alias_path)
+    if not ap.exists():
+        return {}
+    try:
+        import json
+        d = json.loads(ap.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+    if not isinstance(d, dict):
+        return {}
+
+    out: Dict[str, str] = {}
+
+    model = d.get("model") or {}
+    if isinstance(model, dict):
+        mt = model.get("model_tag")
+        mf = model.get("model_file")
+        if isinstance(mt, str) and mt:
+            out["model_tag"] = mt
+        if isinstance(mf, str) and mf:
+            out["model_file"] = mf
+
+    thr = d.get("thresholds") or {}
+    if isinstance(thr, dict):
+        tf = thr.get("thresholds_file") or thr.get("thresholds_alias") or thr.get("thresholds_path")
+        if isinstance(tf, str) and tf:
+            out["thresholds_file"] = tf
+
+    # Also tolerate flat keys (future-proof)
+    if isinstance(d.get("model_file"), str) and d.get("model_file"):
+        out.setdefault("model_file", d["model_file"])
+    if isinstance(d.get("model_tag"), str) and d.get("model_tag"):
+        out.setdefault("model_tag", d["model_tag"])
+    if isinstance(d.get("thresholds_file"), str) and d.get("thresholds_file"):
+        out.setdefault("thresholds_file", d["thresholds_file"])
+
+    return out
+
 
 
 def load_booster(model_file: str) -> xgb.Booster:
@@ -84,10 +133,25 @@ def main() -> int:
     p.add_argument("--client-id", required=True, help="Client identifier (string)")
     p.add_argument("--request-id", default=None, help="Request identifier (string)")
     p.add_argument("--seed", type=int, default=42, help="Deterministic seed (default: 42)")
+    p.add_argument("--canonical-alias", default=DEFAULT_CANONICAL_ALIAS, help="Path to canonical alias JSON (swap-friendly). If provided, it supplies default model/threshold paths.")
     p.add_argument("--model-file", default=DEFAULT_MODEL_FILE, help="Path to XGBoost model (.json)")
     p.add_argument("--thresholds-alias", default=DEFAULT_THRESHOLDS_ALIAS, help="Path to thresholds alias (.json)")
     p.add_argument("--mode", default=None, help="Threshold mode key (defaults to alias recommended_default_mode)")
     args = p.parse_args()
+
+
+    # Canonical alias resolution (swap-friendly defaults)
+    try:
+        alias = load_canonical_alias(args.canonical_alias)
+        # Only override if user did not explicitly override defaults
+        if alias.get("model_file") and args.model_file == DEFAULT_MODEL_FILE:
+            args.model_file = alias["model_file"]
+        if alias.get("thresholds_file") and args.thresholds_alias == DEFAULT_THRESHOLDS_ALIAS:
+            args.thresholds_alias = alias["thresholds_file"]
+        alias_model_tag = alias.get("model_tag")
+    except Exception:
+        alias_model_tag = None
+
 
     t0 = time.time()
 
