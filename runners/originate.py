@@ -10,7 +10,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
-from contract_validate import validate_required, REQUIRED_T2_V0_1, REQUIRED_T3_V0_1, REQUIRED_T4_V0_1
+from contract_validate import validate_required, REQUIRED_T2_V0_1, REQUIRED_T3_V0_1, REQUIRED_T4_V0_1, REQUIRED_BRMS_FLAGS_V0_1, REQUIRED_FINAL_DECISION_V0_1
 
 
 def utc_now_iso() -> str:
@@ -276,6 +276,7 @@ def main() -> int:
     brms_flags = None
     if args.brms_stub:
         brms_flags = json.loads(Path(args.brms_stub).read_text(encoding="utf-8"))
+        validate_required(brms_flags, REQUIRED_BRMS_FLAGS_V0_1, where="originate:brms_stub")
         args.no_brms = True
     # Sub-agents (local CLIs). Each runner reads its canonical alias by default.
     t2 = run_json([sys.executable, "runners/runner_t2.py", "--client-id", str(args.client_id), "--seed", str(args.seed), "--request-id", request_id])
@@ -315,7 +316,7 @@ def main() -> int:
                 "context": {"policy_id": "P1", "policy_version": "1.0", "validation_mode": "TEST"}
             }
             brms_flags = fetch_brms_flags(args.brms_url, brms_payload)
-            # MARKER: BRMS_FLAGS_SNAPSHOT_V0_1
+            validate_required(brms_flags, REQUIRED_BRMS_FLAGS_V0_1, where="originate:brms_live")# MARKER: BRMS_FLAGS_SNAPSHOT_V0_1
             # Persist BRMS flags snapshot for E2E debugging (best-effort)
             try:
                 from pathlib import Path as _Path
@@ -335,6 +336,7 @@ def main() -> int:
     pack["decisions"]["final_decision"] = policy_decider_v0_1(decision_pack=pack, brms_flags=brms_flags)
 
 
+    validate_required(pack["decisions"]["final_decision"], REQUIRED_FINAL_DECISION_V0_1, where="originate:final_decision")
     if args.out:
         with open(args.out, "w", encoding="utf-8") as f:
             f.write(json.dumps(pack, indent=2) + "\n")

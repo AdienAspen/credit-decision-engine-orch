@@ -90,3 +90,27 @@ REQUIRED_T4_V0_1 = [
     ("meta_client_id", "nonempty_str"),
     ("meta_latency_ms", "number"),
 ]
+
+REQUIRED_BRMS_FLAGS_V0_1 = [
+    ("meta_schema_version", "nonempty_str"),
+    ("meta_generated_at", "nonempty_str"),
+    ("meta_request_id", "nonempty_str"),
+    ("meta_client_id", "nonempty_str"),
+    ("meta_policy_id", "nonempty_str"),
+    ("meta_policy_version", "nonempty_str"),
+    ("meta_validation_mode", "nonempty_str"),
+    ("meta_latency_ms", "number"),
+    ("gates", "dict"),
+]
+
+REQUIRED_FINAL_DECISION_V0_1 = [
+    ("meta_schema_version", "nonempty_str"),
+    ("meta_generated_at", "nonempty_str"),
+    ("meta_request_id", "nonempty_str"),
+    ("meta_client_id", "nonempty_str"),
+    ("policy_id", "nonempty_str"),
+    ("policy_version", "nonempty_str"),
+    ("validation_mode", "nonempty_str"),
+    ("final_outcome", "nonempty_str"),
+    ("final_reason_code", "nonempty_str"),
+]
