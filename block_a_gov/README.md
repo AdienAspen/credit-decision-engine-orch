@@ -23,6 +23,46 @@ Located in `spec/`:
 - `spec/risk_decision_t3_v0_1.md` — T3 runner output contract
 - `spec/risk_decision_t4_v0_1.md` — T4 runner output contract
 
+## ORIGINATE responsibilities: decision-taking vs coordination
+
+### ORIGINATE as Decision Taker (Policy Keeper)
+ORIGINATE produces the final, auditable outcome from normalized signals and BRMS gates, emitting a stable `final_decision_v0_1`.
+It is the *policy surface* of the system: deterministic outcomes + stable reason codes + minimal explainability signals.
+
+**Includes**
+- Deterministic policy evaluation over runner outputs (T2/T3/T4 normalized bands) + optional BRMS gates into `final_decision_v0_1`.
+- Stable reason codes, dominant signals, overrides applied, required docs, and concise A/B summaries.
+- Contract validation for the final decision payload (fail-fast on broken invariants).
+
+**Does NOT include**
+- Model training, feature engineering, or dataset logic (belongs to each task repo/pipeline).
+- Re-implementing BRMS logic inside ORIGINATE (DMN/DRL remain in Block B).
+- Long-form narrative explanations (belongs to the REPORTER agent).
+
+**Done when**
+- `final_decision_v0_1` fields are stable, validated, and regression-tested (smokes + edge cases).
+- Reason codes and priority rules remain consistent across STUB/LIVE lanes.
+
+### ORIGINATE as Agent Coordinator (Runtime Wiring & Contracts)
+ORIGINATE coordinates sub-agents and assembles `decision_pack_v0_1` in a swap-friendly, contract-validated way.
+It is the *plumbing surface*: canonical aliases, stable contracts, uniform meta/observability, and explicit integration lanes.
+
+**Includes**
+- Calls T2/T3/T4 runners using canonical alias JSONs as the only source of truth for model/threshold pointers.
+- Validates runner outputs + BRMS flags against minimal required contracts before building the decision pack.
+- Homogenizes `meta_*` fields at the pack level (request_id, latency, schema versions) and persists debugging snapshots when enabled.
+- Supports two explicit lanes: deterministic STUB (fixtures) and LIVE (bridge→KIE/DMN), with promotion gates to move LIVE to the main path safely.
+
+**Does NOT include**
+- Owning external service uptime/state (bridge/BRMS are separate services with their own lifecycle).
+- Ad-hoc environment hacks (prefer venv Python resolution; configuration is explicit and auditable).
+- Hidden coupling to absolute paths beyond canonical aliases (keep swaps local to alias files).
+
+**Done when**
+- Alias swapping changes behavior without code edits (only alias JSON updates).
+- Contract validation fails fast with clear error location; smokes are green for both STUB and LIVE.
+- Pack-level meta + observability are uniform and sufficient for downstream reporting/auditing.
+
 ## Canonical aliases (swap-friendly)
 Runners must read **only** these aliases by default:
 - `artifacts/t2_default_canonical.json` — T2 model + feature list + operating pick (op_a/op_b)
