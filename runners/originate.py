@@ -304,6 +304,11 @@ def main() -> int:
     # BRMS policy snapshot (stable indirection; loaded from canonical alias)
     pack["meta_brms_policy_snapshot"] = load_brms_policy_snapshot()
 
+    # Normalize stub meta to align with decision_pack meta_* (cara# hygiene)
+    if brms_flags is not None and args.brms_stub:
+        brms_flags["meta_request_id"] = pack["meta_request_id"]
+        brms_flags["meta_generated_at"] = pack["meta_generated_at"]
+
 
     # BRMS bridge (online) — fail-open (MVP)
     if (not args.no_brms) and args.brms_url:
@@ -334,6 +339,7 @@ def main() -> int:
     # PolicyDecider v0.1 (pure) — emit final_decision_v0_1
 
     pack["decisions"]["final_decision"] = policy_decider_v0_1(decision_pack=pack, brms_flags=brms_flags)
+    pack["decisions"]["final_decision"]["meta_latency_ms"] = pack["meta_latency_ms"]
 
 
     validate_required(pack["decisions"]["final_decision"], REQUIRED_FINAL_DECISION_V0_1, where="originate:final_decision")
