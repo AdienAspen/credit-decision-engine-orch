@@ -37,6 +37,189 @@ def fetch_brms_flags(brms_url: str, payload: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
+def _default_fraud_signals_stub() -> Dict[str, Any]:
+    return {
+        "dyn_device_behavior_fraud_score_24h": 0.15,
+        "dyn_transaction_anomaly_score_30d": 0.25,
+        "sensor_trace": {
+            "device_behavior": {
+                "mode": "STUB",
+                "status": "OK",
+                "source": "stub_default",
+                "latency_ms": 0,
+                "lookback_hours": 24,
+            },
+            "transaction_anomaly": {
+                "mode": "STUB",
+                "status": "OK",
+                "source": "stub_default",
+                "latency_ms": 0,
+                "lookback_days": 30,
+            },
+        },
+    }
+
+
+def _load_fraud_signals_stub(path: Optional[str]) -> Dict[str, Any]:
+    if not path:
+        return _default_fraud_signals_stub()
+    p = Path(path)
+    if not p.exists():
+        return _default_fraud_signals_stub()
+    d = json.loads(p.read_text(encoding="utf-8"))
+    if not isinstance(d, dict):
+        return _default_fraud_signals_stub()
+    base = _default_fraud_signals_stub()
+    base.update({k: v for k, v in d.items() if k != "sensor_trace"})
+    if isinstance(d.get("sensor_trace"), dict):
+        base["sensor_trace"].update(d["sensor_trace"])
+    return base
+
+
+def _load_fraud_signals_attached(path: Optional[str]) -> Optional[Dict[str, Any]]:
+    if not path:
+        return None
+    p = Path(path)
+    if not p.exists():
+        return None
+    d = json.loads(p.read_text(encoding="utf-8"))
+    if not isinstance(d, dict):
+        return None
+    return d
+
+
+def _safe_float(v: Any, default: float) -> float:
+    try:
+        return float(v)
+    except Exception:
+        return float(default)
+
+
+def _fetch_sensor_json_live(base_url: str, endpoint: str, params: Dict[str, Any], timeout_s: float) -> Dict[str, Any]:
+    try:
+        import requests
+    except Exception as e:
+        raise RuntimeError("requests is required for LIVE dynamic sensors") from e
+    r = requests.get(f"{base_url.rstrip('/')}{endpoint}", params=params, timeout=timeout_s)
+    r.raise_for_status()
+    out = r.json()
+    if not isinstance(out, dict):
+        raise ValueError("Expected JSON object from sensor endpoint")
+    return out
+
+
+def resolve_fraud_signals(
+    *,
+    client_id: str,
+    request_id: str,
+    seed: int,
+    mode: str,
+    stub_path: Optional[str],
+    sensor_base_url: str,
+    sensor_timeout_ms: int,
+    device_high_thr: float,
+    tx_high_thr: float,
+    double_high_action: str,
+) -> Dict[str, Any]:
+    d = _load_fraud_signals_stub(stub_path)
+    out: Dict[str, Any] = {
+        "meta_schema_version": "originate_dynamic_fraud_signals_v0_1",
+        "meta_generated_at": utc_now_iso(),
+        "meta_request_id": request_id,
+        "meta_client_id": str(client_id),
+        "dyn_device_behavior_fraud_score_24h": _safe_float(d.get("dyn_device_behavior_fraud_score_24h"), 0.15),
+        "dyn_transaction_anomaly_score_30d": _safe_float(d.get("dyn_transaction_anomaly_score_30d"), 0.25),
+        "sensor_trace": d.get("sensor_trace", _default_fraud_signals_stub()["sensor_trace"]),
+    }
+
+    live_fallback = False
+    if mode.upper() == "LIVE":
+        timeout_s = max(float(sensor_timeout_ms) / 1000.0, 0.1)
+
+        # wC device behavior
+        try:
+            wc = _fetch_sensor_json_live(
+                sensor_base_url,
+                "/sensor/device_behavior_score",
+                {
+                    "client_id": str(client_id),
+                    "lookback_hours": 24,
+                    "request_id": request_id,
+                    "seed": int(seed),
+                },
+                timeout_s,
+            )
+            out["dyn_device_behavior_fraud_score_24h"] = _safe_float(wc.get("device_behavior_fraud_score_24h"), out["dyn_device_behavior_fraud_score_24h"])
+            out["sensor_trace"]["device_behavior"] = {
+                "mode": "LIVE",
+                "status": "OK",
+                "source": wc.get("source", "live"),
+                "latency_ms": int(_safe_float(wc.get("latency_ms"), 0)),
+                "lookback_hours": int(_safe_float(wc.get("lookback_hours"), 24)),
+                "as_of_ts": wc.get("generated_at"),
+            }
+        except Exception:
+            live_fallback = True
+            tr = out["sensor_trace"].get("device_behavior", {}) or {}
+            tr.update({"mode": "LIVE", "status": "FALLBACK"})
+            out["sensor_trace"]["device_behavior"] = tr
+
+        # wB transaction anomaly
+        try:
+            wb = _fetch_sensor_json_live(
+                sensor_base_url,
+                "/sensor/transaction_anomaly_score",
+                {
+                    "client_id": str(client_id),
+                    "lookback_days": 30,
+                    "request_id": request_id,
+                    "seed": int(seed),
+                },
+                timeout_s,
+            )
+            out["dyn_transaction_anomaly_score_30d"] = _safe_float(wb.get("transaction_anomaly_score_30d"), out["dyn_transaction_anomaly_score_30d"])
+            out["sensor_trace"]["transaction_anomaly"] = {
+                "mode": "LIVE",
+                "status": "OK",
+                "source": wb.get("source", "live"),
+                "latency_ms": int(_safe_float(wb.get("latency_ms"), 0)),
+                "lookback_days": int(_safe_float(wb.get("lookback_days"), 30)),
+                "as_of_ts": wb.get("generated_at"),
+            }
+        except Exception:
+            live_fallback = True
+            tr = out["sensor_trace"].get("transaction_anomaly", {}) or {}
+            tr.update({"mode": "LIVE", "status": "FALLBACK"})
+            out["sensor_trace"]["transaction_anomaly"] = tr
+
+    device_high = out["dyn_device_behavior_fraud_score_24h"] >= float(device_high_thr)
+    tx_high = out["dyn_transaction_anomaly_score_30d"] >= float(tx_high_thr)
+    both_high = device_high and tx_high
+
+    reason_codes = []
+    if device_high:
+        reason_codes.append("FS_DEVICE_BEHAVIOR_HIGH")
+    if tx_high:
+        reason_codes.append("FS_TRANSACTION_ANOMALY_HIGH")
+    if both_high:
+        reason_codes.append("FS_DUAL_SIGNAL_HIGH")
+
+    if both_high:
+        action = "BLOCK" if str(double_high_action).upper() == "BLOCK" else "REVIEW"
+    elif device_high or tx_high:
+        action = "STEP_UP"
+    else:
+        action = "ALLOW"
+
+    out["flag_device_suspicious"] = bool(device_high)
+    out["flag_transaction_anomalous"] = bool(tx_high)
+    out["flag_fraud_signal_high"] = bool(device_high or tx_high)
+    out["action_recommended"] = action
+    out["reason_codes"] = reason_codes
+    out["meta_sensor_mode_used"] = "LIVE_FALLBACK" if live_fallback else mode.upper()
+    return out
+
+
 
 def load_brms_policy_snapshot() -> Dict[str, Any]:
     """
@@ -76,10 +259,12 @@ def _a_summary_from_pack(pack: Dict[str, Any]) -> Dict[str, Any]:
     t3 = d.get("t3_fraud", {}) or {}
     t4 = d.get("t4_payoff", {}) or {}
 
+    fs = d.get("fraud_signals", {}) or {}
     return {
         "t2_default": t2.get("decision_default_norm", t2.get("decision_default", "UNKNOWN")),
         "t3_fraud": t3.get("decision_fraud_norm", t3.get("decision_fraud", "UNKNOWN")),
         "t4_payoff": t4.get("decision_payoff_norm", t4.get("decision_payoff", "UNKNOWN")),
+        "fraud_signals_action": fs.get("action_recommended"),
     }
 
 
@@ -147,11 +332,14 @@ def policy_decider_v0_1(
         reason_code = "ELIGIBILITY_FAIL"
         dominant_signals.append("eligibility:fail")
 
+    brms_has_fail = False
+
     # 2) BRMS hard blocks veto
     if final_outcome != "REJECT" and brms_flags:
         gates = brms_flags.get("gates", {}) or {}
         g1, g2, g3 = gates.get("gate_1"), gates.get("gate_2"), gates.get("gate_3")
         if any(x == "FAIL" for x in [g1, g2, g3]):
+            brms_has_fail = True
             final_outcome = "REJECT"
             reason_code = "BRMS_GATE_FAIL"
             if g1 == "FAIL": dominant_signals.append("brms:gate_1_fail")
@@ -170,6 +358,29 @@ def policy_decider_v0_1(
             final_outcome = "REVIEW"
             reason_code = "T3_REVIEW_FRAUD"
             dominant_signals.append("t3:review_fraud")
+
+    # 3.5) Dynamic fraud signals (wB/wC) — routing-oriented in MVP
+    if final_outcome != "REJECT":
+        fs = d.get("fraud_signals", {}) or {}
+        fs_action = str(fs.get("action_recommended", "ALLOW")).upper()
+        fs_reasons = [str(x) for x in (fs.get("reason_codes") or [])]
+        for rc in fs_reasons[:3]:
+            warnings.append(rc)
+
+        if fs_action == "STEP_UP":
+            _set_review("FS_STEP_UP_SIGNAL", "fraud_signals:step_up")
+        elif fs_action == "REVIEW":
+            _set_review("FS_REVIEW_SIGNAL", "fraud_signals:review")
+        elif fs_action == "BLOCK":
+            # BLOCK is allowed only with corroboration (T3 high fraud or BRMS fail).
+            t3 = d.get("t3_fraud", {}) or {}
+            fraud_norm = t3.get("decision_fraud_norm") or t3.get("decision_fraud")
+            if (fraud_norm == "HIGH_FRAUD") or brms_has_fail:
+                final_outcome = "REJECT"
+                reason_code = "FS_BLOCK_CORROBORATED"
+                dominant_signals.append("fraud_signals:block_corroborated")
+            else:
+                _set_review("FS_BLOCK_UNCORROBORATED_REVIEW", "fraud_signals:block_uncorroborated")
 
     # 4) Default risk (T2)
     if final_outcome != "REJECT":
@@ -270,6 +481,14 @@ def main() -> int:
     ap.add_argument("--brms-url", default="http://localhost:8082/bridge/brms_flags", help="BRMS flags endpoint (Block B -> ORIGINATE)")
     ap.add_argument("--brms-stub", default=None, help="Path to brms_flags_v0_1 JSON (offline stub)")
     ap.add_argument("--no-brms", action="store_true", help="Skip BRMS call (offline mode)")
+    ap.add_argument("--fraud-signals-mode", choices=["STUB", "LIVE"], default="STUB")
+    ap.add_argument("--fraud-signals-stub", default="tools/smoke/fixtures/fraud_signals_stub.json")
+    ap.add_argument("--fraud-signals-json", default=None, help="Optional pre-attached fraud signals JSON. If provided and valid, ORIGINATE consumes it instead of fetching.")
+    ap.add_argument("--fraud-sensor-base-url", default="http://127.0.0.1:9000")
+    ap.add_argument("--fraud-sensor-timeout-ms", type=int, default=1200)
+    ap.add_argument("--fraud-device-high-thr", type=float, default=0.80)
+    ap.add_argument("--fraud-transaction-high-thr", type=float, default=0.80)
+    ap.add_argument("--fraud-double-high-action", choices=["REVIEW", "BLOCK"], default="REVIEW")
     args = ap.parse_args()
     t0 = time.time()
     request_id = args.request_id or str(uuid.uuid4())
@@ -303,6 +522,24 @@ def main() -> int:
 
     # BRMS policy snapshot (stable indirection; loaded from canonical alias)
     pack["meta_brms_policy_snapshot"] = load_brms_policy_snapshot()
+
+    # Dynamic fraud/operational signals (wC + wB): consume-if-present, else resolve.
+    attached_fraud_signals = _load_fraud_signals_attached(args.fraud_signals_json)
+    if attached_fraud_signals is not None:
+        pack["decisions"]["fraud_signals"] = attached_fraud_signals
+    else:
+        pack["decisions"]["fraud_signals"] = resolve_fraud_signals(
+            client_id=str(args.client_id),
+            request_id=request_id,
+            seed=int(args.seed),
+            mode=args.fraud_signals_mode,
+            stub_path=args.fraud_signals_stub,
+            sensor_base_url=args.fraud_sensor_base_url,
+            sensor_timeout_ms=int(args.fraud_sensor_timeout_ms),
+            device_high_thr=float(args.fraud_device_high_thr),
+            tx_high_thr=float(args.fraud_transaction_high_thr),
+            double_high_action=args.fraud_double_high_action,
+        )
 
     # Normalize stub meta to align with decision_pack meta_* (cara# hygiene)
     if brms_flags is not None and args.brms_stub:

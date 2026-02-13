@@ -105,6 +105,9 @@ def main() -> int:
     ap.add_argument("--channel", default="web")
     ap.add_argument("--workflow-canonical-alias", default="/home/adien/loan_backbone_ml_BLOCK_A_AGENTS/block_a_gov/artifacts/eligibility_canonical.json")
     ap.add_argument("--eligibility-canonical-alias", default="/home/adien/loan_backbone_ml_BLOCK_A_AGENTS/block_a_gov/artifacts/eligibility_canonical.json")
+    ap.add_argument("--sensor-mode", choices=["STUB", "LIVE"], default="STUB")
+    ap.add_argument("--sensor-base-url", default="http://127.0.0.1:9000")
+    ap.add_argument("--sensor-timeout-ms", type=int, default=1200)
     ap.add_argument("--brms-url", default="http://localhost:8090/bridge/brms_flags")
     ap.add_argument("--brms-stub", default=DEFAULT_BRMS_STUB)
     ap.add_argument("--no-brms", action="store_true")
@@ -143,6 +146,12 @@ def main() -> int:
             intake_path,
             "--canonical-alias",
             args.eligibility_canonical_alias,
+            "--sensor-mode",
+            args.sensor_mode,
+            "--sensor-base-url",
+            args.sensor_base_url,
+            "--sensor-timeout-ms",
+            str(args.sensor_timeout_ms),
         ]
         eligibility = run_json(elig_cmd)
     finally:
