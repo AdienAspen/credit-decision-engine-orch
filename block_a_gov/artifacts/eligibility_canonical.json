@@ -1,0 +1,37 @@
+{
+  "artifact_kind": "eligibility_agent_alias",
+  "alias_name": "eligibility_canonical",
+  "schema_version": "eligibility_agent_alias_v0_1",
+  "input_schema_version": "application_intake_v0_1",
+  "output_schema_version": "eligibility_agent_status_v0_1",
+  "rules_schema_version": "eligibility_agent_rules_v0_1",
+  "mode": {
+    "default": "STUB",
+    "supported": [
+      "STUB",
+      "LIVE"
+    ]
+  },
+  "parameters": {
+    "MIN_AGE": 18,
+    "MIN_INCOME": 1200,
+    "MACRO_STRESS_REVIEW_THR": 0.85
+  },
+  "dynamic_sensors": {
+    "for_eligibility": [
+      "wE",
+      "wF"
+    ],
+    "notes": "wF is soft-only in v0.1 (REVIEW_REQUIRED trigger, never hard block)."
+  },
+  "policy": {
+    "credit_score_used_in_eligibility": false,
+    "early_cut_enabled": true,
+    "case_b_review_short_circuit": true
+  },
+  "notes": {
+    "input_contract_doc": "block_a_gov/spec/application_intake_v0_1.md",
+    "output_contract_doc": "block_a_gov/spec/eligibility_agent_status_v0_1.md",
+    "rules_doc": "block_a_gov/spec/eligibility_agent_rules_v0_1.md"
+  }
+}
