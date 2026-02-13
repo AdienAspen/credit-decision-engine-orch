@@ -1,0 +1,20 @@
+{
+  "dyn_device_behavior_fraud_score_24h": 0.15,
+  "dyn_transaction_anomaly_score_30d": 0.25,
+  "sensor_trace": {
+    "device_behavior": {
+      "mode": "STUB",
+      "status": "OK",
+      "source": "stub_fixture_v0_1",
+      "latency_ms": 0,
+      "lookback_hours": 24
+    },
+    "transaction_anomaly": {
+      "mode": "STUB",
+      "status": "OK",
+      "source": "stub_fixture_v0_1",
+      "latency_ms": 0,
+      "lookback_days": 30
+    }
+  }
+}
