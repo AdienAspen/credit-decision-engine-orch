@@ -1,0 +1,44 @@
+{
+  "schema_version": "eval_requests_manifest_v0_1",
+  "dataset_id": "eval_requests_edge_v0_1",
+  "dataset_path": "testing/requests/eval_requests_edge_v0_1.jsonl",
+  "dataset_format": "jsonl",
+  "row_count": 150,
+  "generated_at": "2026-03-02T22:15:24.382214+00:00",
+  "required_fields": [
+    "age",
+    "as_of_ts",
+    "client_id",
+    "declared_income_monthly",
+    "employment_status",
+    "is_existing_customer",
+    "product_type",
+    "request_id",
+    "requested_amount",
+    "seed",
+    "term_months"
+  ],
+  "optional_fields": [
+    "scenario_tag",
+    "channel",
+    "declared_dti",
+    "declared_credit_score",
+    "country_code",
+    "currency",
+    "requested_at_hour"
+  ],
+  "scenario_distribution": {
+    "edge_kyc_not_existing": 30,
+    "edge_age_under_min": 20,
+    "edge_income_below_min": 25,
+    "edge_review_macro_high": 25,
+    "edge_review_bureau_unverified": 25,
+    "edge_borderline_pass": 25
+  },
+  "seed_policy": {
+    "type": "deterministic_sequence",
+    "description": "One seed per request row for reproducible edge replay.",
+    "start_seed": 5001,
+    "row_index_offset": 1
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "schema_version": "eval_requests_manifest_v0_1",
+  "dataset_id": "eval_requests_dev_v0_1",
+  "dataset_path": "testing/requests/eval_requests_dev_v0_1.jsonl",
+  "dataset_format": "jsonl",
+  "row_count": 50,
+  "generated_at": "2026-03-02T21:38:03.607392+00:00",
+  "required_fields": [
+    "request_id",
+    "client_id",
+    "as_of_ts",
+    "seed",
+    "product_type",
+    "requested_amount",
+    "term_months",
+    "age",
+    "employment_status",
+    "declared_income_monthly",
+    "is_existing_customer"
+  ],
+  "optional_fields": [
+    "scenario_tag",
+    "channel",
+    "declared_dti",
+    "declared_credit_score",
+    "country_code",
+    "currency",
+    "requested_at_hour"
+  ],
+  "fields_present": [
+    "age",
+    "as_of_ts",
+    "channel",
+    "client_id",
+    "country_code",
+    "currency",
+    "declared_credit_score",
+    "declared_dti",
+    "declared_income_monthly",
+    "employment_status",
+    "is_existing_customer",
+    "product_type",
+    "request_id",
+    "requested_amount",
+    "requested_at_hour",
+    "scenario_tag",
+    "seed",
+    "term_months"
+  ],
+  "seed_policy": {
+    "type": "deterministic_sequence",
+    "description": "One seed per request row, sequential and stable for reproducibility.",
+    "start_seed": 1000,
+    "row_index_offset": 0
+  }
+}
