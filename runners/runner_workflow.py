@@ -83,6 +83,16 @@ def main() -> int:
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--canonical-alias", default=DEFAULT_CANONICAL_ALIAS)
     ap.add_argument("--as-of-ts", default=None)
+    # Optional intake overrides (used by batch replay datasets)
+    ap.add_argument("--age", type=int, default=None)
+    ap.add_argument("--employment-status", choices=["EMPLOYED", "SELF_EMPLOYED", "OTHER"], default=None)
+    ap.add_argument("--declared-income-monthly", type=float, default=None)
+    ap.add_argument("--is-existing-customer", default=None)
+    ap.add_argument("--declared-dti", type=float, default=None)
+    ap.add_argument("--declared-credit-score", type=float, default=None)
+    ap.add_argument("--requested-amount", type=float, default=None)
+    ap.add_argument("--term-months", type=int, default=None)
+    ap.add_argument("--product-type", default=None)
     args = ap.parse_args()
 
     t0 = time.time()
@@ -96,7 +106,17 @@ def main() -> int:
     rng = random.Random(seeded)
 
     is_existing = _as_bool(alias.get("policy", {}).get("only_existing_customers"), True)
-    employment_status = ["EMPLOYED", "SELF_EMPLOYED", "OTHER"][rng.randint(0, 2)]
+    if args.is_existing_customer is not None:
+        is_existing = _as_bool(args.is_existing_customer, is_existing)
+
+    employment_status = args.employment_status or ["EMPLOYED", "SELF_EMPLOYED", "OTHER"][rng.randint(0, 2)]
+    age = int(args.age) if args.age is not None else 21 + rng.randint(0, 35)
+    income_monthly = float(args.declared_income_monthly) if args.declared_income_monthly is not None else float(1200 + rng.randint(0, 5000))
+    declared_dti = float(args.declared_dti) if args.declared_dti is not None else round(0.1 + rng.random() * 0.6, 4)
+    declared_credit_score = float(args.declared_credit_score) if args.declared_credit_score is not None else None
+    loan_amount = float(args.requested_amount) if args.requested_amount is not None else float(2000 + rng.randint(0, 30000))
+    loan_term_months = int(args.term_months) if args.term_months is not None else [12, 24, 36, 48, 60][rng.randint(0, 4)]
+    product_type = str(args.product_type) if args.product_type is not None else "consumer_loan"
 
     payload = {
         "meta_schema_version": "application_intake_v0_1",
@@ -110,14 +130,15 @@ def main() -> int:
         "applicant": {
             "customer_id": f"cust-{args.client_id}",
             "is_existing_customer": is_existing,
-            "age": 21 + rng.randint(0, 35),
-            "income_monthly": float(1200 + rng.randint(0, 5000)),
+            "age": age,
+            "income_monthly": income_monthly,
             "employment_status": employment_status,
-            "declared_dti": round(0.1 + rng.random() * 0.6, 4),
+            "declared_dti": declared_dti,
         },
         "loan": {
-            "loan_amount": float(2000 + rng.randint(0, 30000)),
-            "loan_term_months": [12, 24, 36, 48, 60][rng.randint(0, 4)],
+            "loan_amount": loan_amount,
+            "loan_term_months": loan_term_months,
+            "product_type": product_type,
         },
         "dynamic_sensors_for_eligibility": {
             "dyn_bureau_employment_verified": rng.random() > 0.15,
@@ -125,6 +146,8 @@ def main() -> int:
             "dyn_market_stress_score_7d": round(rng.random(), 4),
         },
     }
+    if declared_credit_score is not None:
+        payload["applicant"]["declared_credit_score"] = declared_credit_score
 
     payload["meta_latency_ms"] = int((time.time() - t0) * 1000)
     validate_intake(payload)

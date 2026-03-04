@@ -108,6 +108,17 @@ def main() -> int:
     ap.add_argument("--sensor-mode", choices=["STUB", "LIVE"], default="STUB")
     ap.add_argument("--sensor-base-url", default="http://127.0.0.1:9000")
     ap.add_argument("--sensor-timeout-ms", type=int, default=1200)
+    # Optional intake overrides forwarded to runner_workflow.py
+    ap.add_argument("--as-of-ts", default=None)
+    ap.add_argument("--age", type=int, default=None)
+    ap.add_argument("--employment-status", choices=["EMPLOYED", "SELF_EMPLOYED", "OTHER"], default=None)
+    ap.add_argument("--declared-income-monthly", type=float, default=None)
+    ap.add_argument("--is-existing-customer", default=None)
+    ap.add_argument("--declared-dti", type=float, default=None)
+    ap.add_argument("--declared-credit-score", type=float, default=None)
+    ap.add_argument("--requested-amount", type=float, default=None)
+    ap.add_argument("--term-months", type=int, default=None)
+    ap.add_argument("--product-type", default=None)
     ap.add_argument("--brms-url", default="http://localhost:8090/bridge/brms_flags")
     ap.add_argument("--brms-stub", default=DEFAULT_BRMS_STUB)
     ap.add_argument("--no-brms", action="store_true")
@@ -132,6 +143,26 @@ def main() -> int:
         "--canonical-alias",
         args.workflow_canonical_alias,
     ]
+    if args.as_of_ts:
+        wf_cmd.extend(["--as-of-ts", args.as_of_ts])
+    if args.age is not None:
+        wf_cmd.extend(["--age", str(args.age)])
+    if args.employment_status:
+        wf_cmd.extend(["--employment-status", args.employment_status])
+    if args.declared_income_monthly is not None:
+        wf_cmd.extend(["--declared-income-monthly", str(args.declared_income_monthly)])
+    if args.is_existing_customer is not None:
+        wf_cmd.extend(["--is-existing-customer", str(args.is_existing_customer)])
+    if args.declared_dti is not None:
+        wf_cmd.extend(["--declared-dti", str(args.declared_dti)])
+    if args.declared_credit_score is not None:
+        wf_cmd.extend(["--declared-credit-score", str(args.declared_credit_score)])
+    if args.requested_amount is not None:
+        wf_cmd.extend(["--requested-amount", str(args.requested_amount)])
+    if args.term_months is not None:
+        wf_cmd.extend(["--term-months", str(args.term_months)])
+    if args.product_type:
+        wf_cmd.extend(["--product-type", str(args.product_type)])
     intake = run_json(wf_cmd)
 
     # 2) Eligibility using the generated intake
