@@ -11,3 +11,11 @@ reports/
 # Testing runtime outputs (generated)
 testing/runs/
 testing/_logs/
+# Externalized heavy/runtime directories
+.datasets/
+datasets/
+models/
+artifacts/
+logs/
+checkpoints/
+tools/smoke/_logs/

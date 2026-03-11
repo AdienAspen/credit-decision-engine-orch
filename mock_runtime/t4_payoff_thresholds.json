@@ -1,0 +1,11 @@
+{
+  "recommended_default_mode": "thr_valid_best_f1",
+  "panel_valid": {
+    "thr_valid_best_f1": {
+      "threshold": 0.67
+    },
+    "thr_valid_recall_ge_0_90": {
+      "threshold": 0.59
+    }
+  }
+}

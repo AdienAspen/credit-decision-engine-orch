@@ -9,8 +9,12 @@ import sys
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 from typing import Any, Dict, Optional
 from contract_validate import validate_required, REQUIRED_T2_V0_1, REQUIRED_T3_V0_1, REQUIRED_T4_V0_1, REQUIRED_BRMS_FLAGS_V0_1, REQUIRED_FINAL_DECISION_V0_1
+from tools.mock_brms_logic import evaluate_mock_brms_flags
 
 
 def utc_now_iso() -> str:
@@ -27,6 +31,7 @@ def fetch_brms_flags(brms_url: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         import requests
     except Exception as e:
         raise RuntimeError("requests is required for BRMS bridge (pip install requests)") from e
+
     t0 = time.time()
     r = requests.post(brms_url, json=payload, timeout=10)
     r.raise_for_status()
@@ -338,7 +343,7 @@ def policy_decider_v0_1(
     if final_outcome != "REJECT" and brms_flags:
         gates = brms_flags.get("gates", {}) or {}
         g1, g2, g3 = gates.get("gate_1"), gates.get("gate_2"), gates.get("gate_3")
-        if any(x == "FAIL" for x in [g1, g2, g3]):
+        if any(str(x).upper() in {"FAIL", "BLOCK"} for x in [g1, g2, g3]):
             brms_has_fail = True
             final_outcome = "REJECT"
             reason_code = "BRMS_GATE_FAIL"
@@ -474,7 +479,8 @@ def policy_decider_v0_1(
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--client-id", required=True)
+    ap.add_argument("--client-id", default=None)
+    ap.add_argument("--demo", action="store_true", help="Run the full pipeline with mock defaults.")
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--request-id", default=None)
     ap.add_argument("--out", default=None, help="Optional path to write decision_pack json")
@@ -490,6 +496,7 @@ def main() -> int:
     ap.add_argument("--fraud-transaction-high-thr", type=float, default=0.80)
     ap.add_argument("--fraud-double-high-action", choices=["REVIEW", "BLOCK"], default="REVIEW")
     args = ap.parse_args()
+
     t0 = time.time()
     request_id = args.request_id or str(uuid.uuid4())
     brms_flags = None
@@ -547,6 +554,17 @@ def main() -> int:
         brms_flags["meta_generated_at"] = pack["meta_generated_at"]
 
 
+    if args.demo and brms_flags is None:
+        brms_payload = {
+            "meta_request_id": request_id,
+            "meta_client_id": str(args.client_id),
+            "applicant": {"age": 33, "fico_credit_score": 702, "dti": 0.31, "employment_status": "EMPLOYED"},
+            "loan": {"loan_amount": 12000, "loan_term_months": 36},
+            "context": {"policy_id": "P1", "policy_version": "1.0", "validation_mode": "DEMO"}
+        }
+        brms_flags = evaluate_mock_brms_flags(brms_payload)
+        args.no_brms = True
+
     # BRMS bridge (online) — fail-open (MVP)
     if (not args.no_brms) and args.brms_url:
         try:
@@ -590,3 +608,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

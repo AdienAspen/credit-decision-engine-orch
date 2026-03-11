@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
-DEFAULT_CANONICAL_ALIAS = "/home/adien/loan_backbone_ml_BLOCK_A_AGENTS/block_a_gov/artifacts/eligibility_canonical.json"
+DEFAULT_CANONICAL_ALIAS = "block_a_gov/artifacts/eligibility_canonical.json"
 
 
 def utc_now_iso() -> str:
@@ -252,3 +252,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

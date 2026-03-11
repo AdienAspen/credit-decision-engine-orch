@@ -9,6 +9,9 @@ import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 from typing import Any, Dict, List
 
 from contract_validate import validate_required, REQUIRED_FINAL_DECISION_V0_1
@@ -103,8 +106,8 @@ def main() -> int:
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--request-id", default=None)
     ap.add_argument("--channel", default="web")
-    ap.add_argument("--workflow-canonical-alias", default="/home/adien/loan_backbone_ml_BLOCK_A_AGENTS/block_a_gov/artifacts/eligibility_canonical.json")
-    ap.add_argument("--eligibility-canonical-alias", default="/home/adien/loan_backbone_ml_BLOCK_A_AGENTS/block_a_gov/artifacts/eligibility_canonical.json")
+    ap.add_argument("--workflow-canonical-alias", default="block_a_gov/artifacts/eligibility_canonical.json")
+    ap.add_argument("--eligibility-canonical-alias", default="block_a_gov/artifacts/eligibility_canonical.json")
     ap.add_argument("--sensor-mode", choices=["STUB", "LIVE"], default="STUB")
     ap.add_argument("--sensor-base-url", default="http://127.0.0.1:9000")
     ap.add_argument("--sensor-timeout-ms", type=int, default=1200)
@@ -253,3 +256,5 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+

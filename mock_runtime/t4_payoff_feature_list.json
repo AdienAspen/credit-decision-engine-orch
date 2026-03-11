@@ -1,0 +1,9 @@
+{
+  "features": [
+    "income_monthly",
+    "loan_amount",
+    "loan_term_months",
+    "declared_dti",
+    "declared_credit_score"
+  ]
+}

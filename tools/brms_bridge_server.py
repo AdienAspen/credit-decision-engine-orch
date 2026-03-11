@@ -1,26 +1,36 @@
 #!/usr/bin/env python3
 # Minimal BRMS Bridge Server (HTTP) -> returns brms_flags_v0_1
-from fastapi import FastAPI, HTTPException
-from typing import Any, Dict
-import time
+from __future__ import annotations
 
-from tools.brms_bridge_kie import call_kie_dmn, to_brms_flags_v0_1, DEFAULT_KIE_URL, DEFAULT_USER, DEFAULT_PASS
+import os
+import time
+from typing import Any, Dict
+
+from fastapi import FastAPI, HTTPException
+
+from tools.brms_bridge_kie import DEFAULT_KIE_URL, DEFAULT_PASS, DEFAULT_USER, call_kie_dmn, to_brms_flags_v0_1
+from tools.mock_brms_logic import evaluate_mock_brms_flags
 
 app = FastAPI()
 
+
 @app.get("/health")
 def health() -> Dict[str, Any]:
-    return {"ok": True}
+    return {"ok": True, "mode": os.getenv("BRMS_BRIDGE_MODE", "kie").lower()}
+
 
 @app.post("/bridge/brms_flags")
 def bridge_brms_flags(req_payload: Dict[str, Any]) -> Dict[str, Any]:
-    # Minimal contract fields
     request_id = req_payload.get("meta_request_id") or "sample"
     client_id = req_payload.get("meta_client_id") or "unknown"
-
     applicant = req_payload.get("applicant", {}) or {}
     loan = req_payload.get("loan", {}) or {}
     ctx = req_payload.get("context", {}) or {}
+
+    if os.getenv("BRMS_BRIDGE_MODE", "kie").upper() == "MOCK":
+        out = evaluate_mock_brms_flags(req_payload)
+        out["meta_latency_ms"] = 0
+        return out
 
     dmn_context = {
         "Applicant": {
@@ -48,25 +58,19 @@ def bridge_brms_flags(req_payload: Dict[str, Any]) -> Dict[str, Any]:
     t0 = time.time()
     try:
         dmn_eval = call_kie_dmn(kie_url, user, pw, dmn_context)
-        # MARKER: DMN_SNAPSHOT_V0_1
-        # Persist DMN inputs/outputs for debugging (best-effort)
-        try:
-            from pathlib import Path as _Path
-            import json as _json
-            _dir = _Path('tools/smoke/_logs')
-            _dir.mkdir(parents=True, exist_ok=True)
-            _dir.joinpath('last_dmn_context.json').write_text(_json.dumps(dmn_context, indent=2, default=str), encoding='utf-8')
-            _dir.joinpath('last_dmn_eval.json').write_text(_json.dumps(dmn_eval, indent=2, default=str), encoding='utf-8')
-        except Exception:
-            pass
         out = to_brms_flags_v0_1(dmn_eval, request_id, client_id)
         out["meta_latency_ms"] = int((time.time() - t0) * 1000)
         return out
     except Exception as e:
-        import traceback
-        traceback.print_exc()
+        if os.getenv("BRMS_BRIDGE_FAILOVER_MOCK", "1") == "1":
+            out = evaluate_mock_brms_flags(req_payload)
+            out["meta_latency_ms"] = int((time.time() - t0) * 1000)
+            out.setdefault("warnings", []).append("BRMS_KIE_FALLBACK_TO_MOCK")
+            return out
         raise HTTPException(status_code=502, detail=f"BRMS bridge failed: {e}")
+
 
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8090)
+

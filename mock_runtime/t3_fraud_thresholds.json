@@ -1,0 +1,6 @@
+{
+  "recommended_default_mode": "thr_valid_recall_ge_0_90",
+  "thr_valid_recall_ge_0_90": 0.72,
+  "thr_valid_best_f1": 0.81,
+  "thr_valid_precision_ge_0_70": 0.68
+}
